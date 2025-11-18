@@ -1,0 +1,29 @@
+-- MySQL example migrations
+CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(100) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role ENUM('user','admin') DEFAULT 'user',
+  max_streams INT DEFAULT 2,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS channels (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  stream_url TEXT NOT NULL,
+  logo VARCHAR(255),
+  category VARCHAR(100),
+  is_active TINYINT(1) DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS epg (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  channel_id INT NOT NULL,
+  start DATETIME NOT NULL,
+  stop DATETIME NOT NULL,
+  title VARCHAR(255),
+  description TEXT,
+  FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
