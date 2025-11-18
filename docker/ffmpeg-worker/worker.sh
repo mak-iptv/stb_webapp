@@ -55,7 +55,7 @@ run_ffmpeg() {
     echo "[INFO] Uploading to S3 bucket: $AWS_BUCKET/$output_prefix/"
     aws s3 cp "$tmp_dir" "s3://$AWS_BUCKET/$output_prefix/" --recursive --acl public-read
 
-    # Opsional: gjenero signed URL për playlist
+    # Gjenero signed URL për playlist
     signed_url=$(aws s3 presign "s3://$AWS_BUCKET/$output_prefix/output.m3u8" --expires-in 3600)
     echo "[INFO] Signed URL (valid 1h): $signed_url"
 
