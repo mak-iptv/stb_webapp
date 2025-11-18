@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Instalo ffmpeg + curl + redis-cli + jq + awscli
+# Instalo dependencies: ffmpeg, curl, redis-cli, jq, awscli
 RUN apt-get update && \
     apt-get install -y ffmpeg curl redis-tools jq python3 python3-pip && \
     pip3 install --no-cache-dir awscli && \
