@@ -1,0 +1,5 @@
+{
+  "name": "iptv/render-starter",
+  "description": "Minimal PHP IPTV starter for Render",
+  "require": {}
+}
