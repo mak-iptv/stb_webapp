@@ -6,9 +6,7 @@ echo "--------------------------------------------"
 echo "Start Time: $(date)"
 echo ""
 
-# -----------------------------
 # ENV CONFIG
-# -----------------------------
 REDIS_HOST="${REDIS_HOST:-redis}"
 REDIS_PORT="${REDIS_PORT:-6379}"
 REDIS_QUEUE="${REDIS_QUEUE:-ffmpeg_jobs}"
@@ -18,18 +16,14 @@ AWS_BUCKET="${AWS_BUCKET:-iptv-bucket}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 RETRY_DELAY="${RETRY_DELAY:-5}"
 
-# -----------------------------
 # Funksioni për të nxjerrë punë nga Redis
-# -----------------------------
 fetch_job() {
     job=$(redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" BLPOP "$REDIS_QUEUE" 0)
     job_data=$(echo "$job" | awk '{for(i=2;i<=NF;i++) printf $i " ";}')
     echo "$job_data"
 }
 
-# -----------------------------
 # Funksioni për të ekzekutuar FFmpeg dhe upload në S3
-# -----------------------------
 run_ffmpeg() {
     local input_url="$1"
     local output_prefix="$2"
@@ -51,7 +45,7 @@ run_ffmpeg() {
         return 1
     fi
 
-    # Upload të gjitha segmentet në S3
+    # Upload në S3
     echo "[INFO] Uploading to S3 bucket: $AWS_BUCKET/$output_prefix/"
     aws s3 cp "$tmp_dir" "s3://$AWS_BUCKET/$output_prefix/" --recursive --acl public-read
 
@@ -59,13 +53,10 @@ run_ffmpeg() {
     signed_url=$(aws s3 presign "s3://$AWS_BUCKET/$output_prefix/output.m3u8" --expires-in 3600)
     echo "[INFO] Signed URL (valid 1h): $signed_url"
 
-    # Clean temp
     rm -rf "$tmp_dir"
 }
 
-# -----------------------------
 # Main loop
-# -----------------------------
 while true; do
     echo "[INFO] Waiting for next job from Redis queue '$REDIS_QUEUE'..."
     job_json=$(fetch_job)
