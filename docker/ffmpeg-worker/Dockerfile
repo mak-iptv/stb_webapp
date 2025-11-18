@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Instalo dependencies: ffmpeg, curl, redis-cli, jq, python3 + awscli
+# Instalo dependencies
 RUN apt-get update && \
     apt-get install -y \
         ffmpeg \
