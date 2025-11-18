@@ -38,4 +38,50 @@ run_ffmpeg() {
     tmp_dir=$(mktemp -d)
     echo "[INFO] Output temp dir: $tmp_dir"
 
-    #
+    # Ruaj HLS segments lokal
+    ffmpeg -hide_banner -loglevel error -y \
+        -i "$input_url" \
+        $ffmpeg_args \
+        "$tmp_dir/output.m3u8"
+
+    EXIT_CODE=$?
+    if [[ $EXIT_CODE -ne 0 ]]; then
+        echo "[ERROR] FFmpeg failed with code $EXIT_CODE"
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    # Upload të gjitha segmentet në S3
+    echo "[INFO] Uploading to S3 bucket: $AWS_BUCKET/$output_prefix/"
+    aws s3 cp "$tmp_dir" "s3://$AWS_BUCKET/$output_prefix/" --recursive --acl public-read
+
+    # Opsional: gjenero signed URL për playlist
+    signed_url=$(aws s3 presign "s3://$AWS_BUCKET/$output_prefix/output.m3u8" --expires-in 3600)
+    echo "[INFO] Signed URL (valid 1h): $signed_url"
+
+    # Clean temp
+    rm -rf "$tmp_dir"
+}
+
+# -----------------------------
+# Main loop
+# -----------------------------
+while true; do
+    echo "[INFO] Waiting for next job from Redis queue '$REDIS_QUEUE'..."
+    job_json=$(fetch_job)
+
+    # Job JSON: {"input_url":"...","output_prefix":"...","ffmpeg_args":"..."}
+    input_url=$(echo "$job_json" | jq -r '.input_url')
+    output_prefix=$(echo "$job_json" | jq -r '.output_prefix')
+    ffmpeg_args=$(echo "$job_json" | jq -r '.ffmpeg_args // "-c:v copy -c:a copy -f hls"')
+
+    if [[ -z "$input_url" || -z "$output_prefix" ]]; then
+        echo "[ERROR] Invalid job: $job_json"
+        sleep $RETRY_DELAY
+        continue
+    fi
+
+    run_ffmpeg "$input_url" "$output_prefix" "$ffmpeg_args"
+    echo "[INFO] Job finished. Waiting $RETRY_DELAY seconds before next..."
+    sleep $RETRY_DELAY
+done
