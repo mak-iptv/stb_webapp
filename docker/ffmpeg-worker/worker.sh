@@ -1,61 +1,41 @@
 #!/bin/bash
 
 echo "--------------------------------------------"
-echo "   FFmpeg Worker Started"
+echo "   FFmpeg Worker Cloud-ready (S3 Upload)"
 echo "--------------------------------------------"
 echo "Start Time: $(date)"
 echo ""
 
 # -----------------------------
-# Konfigurime nga ENV
+# ENV CONFIG
 # -----------------------------
-
-INPUT_URL="${INPUT_URL:-""}"
-OUTPUT_URL="${OUTPUT_URL:-""}"
-FFMPEG_ARGS="${FFMPEG_ARGS:-"-c:v copy -c:a copy -f hls"}"
+REDIS_HOST="${REDIS_HOST:-redis}"
+REDIS_PORT="${REDIS_PORT:-6379}"
+REDIS_QUEUE="${REDIS_QUEUE:-ffmpeg_jobs}"
+AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-}"
+AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}"
+AWS_BUCKET="${AWS_BUCKET:-iptv-bucket}"
+AWS_REGION="${AWS_REGION:-us-east-1}"
 RETRY_DELAY="${RETRY_DELAY:-5}"
 
-# Kontroll nëse mungojnë URL-t
-
-if [[ -z "$INPUT_URL" ]]; then
-    echo "[ERROR] INPUT_URL nuk është vendosur!"
-    echo "Vendose:  docker run -e INPUT_URL=\"http://stream\" ..."
-    exit 1
-fi
-
-if [[ -z "$OUTPUT_URL" ]]; then
-    echo "[ERROR] OUTPUT_URL nuk është vendosur!"
-    exit 1
-fi
-
-echo "[INFO] INPUT_URL  = $INPUT_URL"
-echo "[INFO] OUTPUT_URL = $OUTPUT_URL"
-echo "[INFO] FFMPEG_ARGS = $FFMPEG_ARGS"
-echo ""
-
 # -----------------------------
-# Funksioni kryesor
+# Funksioni për të nxjerrë punë nga Redis
 # -----------------------------
-
-run_ffmpeg() {
-    echo "[INFO] Running FFmpeg..."
-    
-    ffmpeg -hide_banner -loglevel error \
-        -i "$INPUT_URL" \
-        $FFMPEG_ARGS \
-        "$OUTPUT_URL"
-
-    EXIT_CODE=$?
-
-    echo "[WARN] FFmpeg exited with code $EXIT_CODE"
-    echo "[INFO] Restarting FFmpeg in $RETRY_DELAY seconds..."
-    sleep $RETRY_DELAY
+fetch_job() {
+    job=$(redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" BLPOP "$REDIS_QUEUE" 0)
+    job_data=$(echo "$job" | awk '{for(i=2;i<=NF;i++) printf $i " ";}')
+    echo "$job_data"
 }
 
 # -----------------------------
-# Loop i pafund
+# Funksioni për të ekzekutuar FFmpeg dhe upload në S3
 # -----------------------------
+run_ffmpeg() {
+    local input_url="$1"
+    local output_prefix="$2"
+    local ffmpeg_args="$3"
 
-while true; do
-    run_ffmpeg
-done
+    tmp_dir=$(mktemp -d)
+    echo "[INFO] Output temp dir: $tmp_dir"
+
+    #
