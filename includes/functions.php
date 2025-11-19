@@ -203,3 +203,67 @@ function displayChannelsInfo($channels) {
     return $html;
 }
 ?>
+<?php
+// includes/functions.php
+
+/**
+ * Kontrollon nëse MAC address është valide
+ */
+function isValidMacAddress($mac) {
+    if (empty($mac)) {
+        return false;
+    }
+    
+    // Kontrollo formatet e zakonshme të MAC address:
+    // 00:1A:79:29:86:BB (me colon)
+    // 00-1A-79-29-86-BB (me dash)  
+    // 001A792986BB (pa ndarës)
+    $pattern = '/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})|([0-9A-Fa-f]{12})$/';
+    return preg_match($pattern, $mac);
+}
+
+/**
+ * Formatton MAC address në formatin standard
+ */
+function formatMacAddress($mac) {
+    if (empty($mac)) {
+        return generateMacAddress();
+    }
+    
+    // Largo karakteret e panevojshme
+    $mac = preg_replace('/[^0-9A-Fa-f]/', '', $mac);
+    
+    // Sigurohu që ka 12 karaktere
+    if (strlen($mac) !== 12) {
+        return generateMacAddress();
+    }
+    
+    // Formatto si: 00:1A:79:XX:XX:XX
+    return implode(':', str_split($mac, 2));
+}
+
+/**
+ * Gjeneron MAC address të re
+ */
+function generateMacAddress() {
+    if (isset($_SESSION['user_mac'])) {
+        return $_SESSION['user_mac'];
+    }
+    
+    // Prefix i zakonshëm për Stalker
+    $prefix = "00:1A:79";
+    
+    // Gjenero 3 byte të fundit
+    $suffix = [];
+    for ($i = 0; $i < 3; $i++) {
+        $suffix[] = sprintf('%02X', mt_rand(0, 255));
+    }
+    
+    $mac = $prefix . ':' . implode(':', $suffix);
+    $_SESSION['user_mac'] = $mac;
+    
+    return $mac;
+}
+
+// ... funksionet e tjera ekzistuese ...
+?>
