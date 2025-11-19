@@ -1,228 +1,256 @@
 <?php
+// includes/functions.php
+
 /**
- * Merr konfigurimin nga session
+ * Funksione për Stalker Middleware - Streaming Live
  */
-function getStalkerConfig() {
-    if (!isset($_SESSION['portal_url']) || !isset($_SESSION['mac_address'])) {
-        error_log("Missing session configuration");
-        return null;
-    }
+
+/**
+ * Gjeneron URL për streaming live
+ */
+function generateLiveStreamUrl($mac, $stream_id, $extension = 'ts', $play_token = null, $sn2 = null) {
+    $base_url = "https://your-stalker-domain.com/play/live.php";
     
-    return [
-        'portal_url' => $_SESSION['portal_url'],
-        'portal_port' => $_SESSION['portal_port'] ?? '',
-        'mac_address' => $_SESSION['mac_address']
+    $params = [
+        'mac' => $mac,
+        'stream' => $stream_id,
+        'extension' => $extension
     ];
+    
+    // Shto play_token nëse ekziston
+    if ($play_token) {
+        $params['play_token'] = $play_token;
+    }
+    
+    // Shto sn2 nëse ekziston
+    if ($sn2) {
+        $params['sn2'] = $sn2;
+    }
+    
+    return $base_url . '?' . http_build_query($params);
 }
 
 /**
- * Merr URL të plotë të portalit
+ * Verifikon MAC address formatin
  */
-function getPortalUrl() {
-    $config = getStalkerConfig();
-    if (!$config) {
-        error_log("No configuration available");
-        return null;
-    }
-    
-    $url = $config['portal_url'];
-    
-    // Sigurohu që URL ka http:// nëse nuk ka
-    if (!preg_match('/^https?:\/\//', $url)) {
-        $url = 'http://' . $url;
-    }
-    
-    error_log("Using portal URL: " . $url);
-    return $url;
+function isValidMacAddress($mac) {
+    return preg_match('/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/', $mac);
 }
 
 /**
- * Merr kanalet nga Stalker provideri
+ * Merr stream URL nga database ose API
  */
-function getChannelsFromProvider($force_refresh = false) {
-    error_log("Getting channels from provider");
-    
-    // Kontrollo nëse kemi konfigurim
-    $config = getStalkerConfig();
-    if (!$config) {
-        error_log("No configuration available for provider");
-        return [];
+function getLiveStreamUrl($stream_id, $user_mac = null) {
+    // Nëse nuk ka MAC, përdor default ose gjenero
+    if (!$user_mac) {
+        $user_mac = getUserMacAddress();
     }
     
-    // Merr kanale nga Stalker API
-    $channels = getChannelsFromStalkerAPI();
+    // Merr play_token nga session ose database
+    $play_token = getPlayToken($stream_id);
     
-    if (!empty($channels)) {
-        error_log("Successfully got " . count($channels) . " channels from API");
-        return $channels;
-    }
+    // Merr sn2 nëse nevojitet
+    $sn2 = getSerialNumber();
     
-    error_log("No channels received from API");
-    return [];
+    return generateLiveStreamUrl($user_mac, $stream_id, 'ts', $play_token, $sn2);
 }
 
 /**
- * Merr kanalet nga Stalker Middleware API
+ * Merr MAC address të përdoruesit
  */
-function getChannelsFromStalkerAPI() {
-    $config = getStalkerConfig();
-    if (!$config) {
-        error_log("No config for API call");
-        return [];
+function getUserMacAddress() {
+    // Mund të merret nga session, database, ose gjenerohet
+    if (isset($_SESSION['user_mac'])) {
+        return $_SESSION['user_mac'];
     }
     
-    $portal_url = getPortalUrl();
-    if (!$portal_url) {
-        error_log("No portal URL for API call");
-        return [];
+    // Ose gjenero një MAC të rastësishëm për përdoruesin
+    return generateRandomMac();
+}
+
+/**
+ * Gjeneron MAC address të rastësishme
+ */
+function generateRandomMac() {
+    $mac = [];
+    for ($i = 0; $i < 6; $i++) {
+        $mac[] = sprintf('%02X', mt_rand(0, 255));
     }
+    return implode(':', $mac);
+}
+
+/**
+ * Merr play token për stream
+ */
+function getPlayToken($stream_id) {
+    // Kjo mund të jetë nga session, database, ose API call
+    if (isset($_SESSION['play_tokens'][$stream_id])) {
+        return $_SESSION['play_tokens'][$stream_id];
+    }
+    
+    // Ose gjenero një token të ri
+    return generatePlayToken($stream_id);
+}
+
+/**
+ * Gjeneron play token
+ */
+function generatePlayToken($stream_id) {
+    $token = md5($stream_id . time() . uniqid());
+    
+    // Ruaj në session për përdorim të mëvonshëm
+    if (!isset($_SESSION['play_tokens'])) {
+        $_SESSION['play_tokens'] = [];
+    }
+    $_SESSION['play_tokens'][$stream_id] = $token;
+    
+    return $token;
+}
+
+/**
+ * Merr serial number (sn2)
+ */
+function getSerialNumber() {
+    // Mund të jetë nga konfigurimi ose database
+    return defined('STB_SERIAL') ? STB_SERIAL : 'default_sn';
+}
+
+/**
+ * Kontrollon nëse stream-i është i disponueshëm
+ */
+function checkStreamAvailability($stream_url) {
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $stream_url,
+        CURLOPT_NOBODY => true,
+        CURLOPT_TIMEOUT => 10,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_RETURNTRANSFER => true
+    ]);
+    
+    curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    return ($http_code === 200);
+}
+
+/**
+ * Merr informacion për stream nga database
+ */
+function getStreamInfo($stream_id) {
+    global $pdo;
     
     try {
-        // Për Stalker Middleware, përdor /server/load.php
-        $api_url = $portal_url . '/server/load.php';
-        error_log("Calling Stalker API: " . $api_url);
+        $stmt = $pdo->prepare("SELECT * FROM streams WHERE stream_id = ?");
+        $stmt->execute([$stream_id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Database error getting stream info: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Log stream request për analizë
+ */
+function logStreamRequest($stream_id, $user_id, $mac, $success = true) {
+    global $pdo;
+    
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO stream_logs 
+            (stream_id, user_id, mac_address, success, created_at) 
+            VALUES (?, ?, ?, ?, NOW())
+        ");
+        $stmt->execute([$stream_id, $user_id, $mac, $success]);
+    } catch (PDOException $e) {
+        error_log("Error logging stream request: " . $e->getMessage());
+    }
+}
+
+/**
+ * Merr listën e stream-eve live të disponueshme
+ */
+function getAvailableLiveStreams($category_id = null) {
+    global $pdo;
+    
+    try {
+        $sql = "SELECT * FROM streams WHERE type = 'live' AND status = 'active'";
+        $params = [];
         
-        $post_data = [
-            'type' => 'stb',
-            'action' => 'get_all_channels',
-            'mac' => $config['mac_address'],
-            'JsHttpRequest' => '1-xml'
-        ];
-        
-        error_log("POST Data: " . print_r($post_data, true));
-        
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $api_url,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => http_build_query($post_data),
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 10,
-            CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_USERAGENT => 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3',
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/x-www-form-urlencoded',
-                'Referer: ' . $portal_url
-            ]
-        ]);
-        
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-        
-        error_log("API Response - HTTP Code: $http_code");
-        error_log("API Error: $error");
-        
-        if ($http_code !== 200) {
-            error_log("API call failed - HTTP $http_code: $error");
-            return [];
+        if ($category_id) {
+            $sql .= " AND category_id = ?";
+            $params[] = $category_id;
         }
         
-        if (empty($response)) {
-            error_log("API returned empty response");
-            return [];
-        }
+        $sql .= " ORDER BY stream_name ASC";
         
-        // Kontrollo nëse përgjigja është JSON
-        $data = json_decode($response, true);
-        
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log("JSON decode error: " . json_last_error_msg());
-            error_log("Response sample: " . substr($response, 0, 200));
-            return [];
-        }
-        
-        if (!isset($data['js']['data'])) {
-            error_log("Invalid API response structure");
-            error_log("Response keys: " . implode(', ', array_keys($data)));
-            return [];
-        }
-        
-        $channels = processStalkerChannels($data['js']['data']);
-        error_log("Processed " . count($channels) . " channels from API");
-        return $channels;
-        
-    } catch (Exception $e) {
-        error_log("Stalker API Exception: " . $e->getMessage());
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Database error getting live streams: " . $e->getMessage());
         return [];
     }
 }
 
 /**
- * Process kanalet nga Stalker API
+ * Kontrollon aksesin e përdoruesit në stream
  */
-function processStalkerChannels($raw_channels) {
-    $portal_url = getPortalUrl();
-    $channels = [];
+function checkUserStreamAccess($user_id, $stream_id) {
+    // Implementoni logjikën e aksesit tuaj këtu
+    // Mund të kontrolloni nëse përdoruesi ka abonim, nëse stream-i është i lirë, etj.
     
-    foreach ($raw_channels as $channel) {
-        if (empty($channel['id']) || empty($channel['name'])) {
-            continue;
-        }
-        
-        $channels[] = [
-            'id' => (int)$channel['id'],
-            'stream_id' => (int)$channel['id'],
-            'name' => trim($channel['name']),
-            'number' => isset($channel['number']) ? (int)$channel['number'] : 0,
-            'category' => $channel['cat_name'] ?? $channel['category'] ?? 'General',
-            'logo' => getStalkerLogoUrl($channel['logo'] ?? $channel['tv_icon_url'] ?? ''),
-            'cmd' => $channel['cmd'] ?? ''
-        ];
-    }
-    
-    // Sort kanalet sipas numrit
-    usort($channels, function($a, $b) {
-        return ($a['number'] ?? 9999) - ($b['number'] ?? 9999);
-    });
-    
-    return $channels;
+    return true; // Ose false nëse nuk ka akses
 }
 
 /**
- * Gjenero URL për logo nga Stalker
+ * Ruan stream në history të përdoruesit
  */
-function getStalkerLogoUrl($logo_path) {
-    if (empty($logo_path)) return '';
+function addToStreamHistory($user_id, $stream_id, $stream_url) {
+    global $pdo;
     
-    $portal_url = getPortalUrl();
-    if (!$portal_url) return '';
-    
-    if (strpos($logo_path, 'http') === 0) {
-        return $logo_path;
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO user_stream_history 
+            (user_id, stream_id, stream_url, watched_at) 
+            VALUES (?, ?, ?, NOW())
+            ON DUPLICATE KEY UPDATE watched_at = NOW()
+        ");
+        $stmt->execute([$user_id, $stream_id, $stream_url]);
+    } catch (PDOException $e) {
+        error_log("Error adding to stream history: " . $e->getMessage());
     }
-    
-    if (strpos($logo_path, '/') === 0) {
-        return $portal_url . $logo_path;
-    }
-    
-    return $portal_url . '/misc/logos/320/' . $logo_path;
 }
 
 /**
- * Gjenero stream URL për Stalker format
+ * Merr stream URL të përgatitur për player
  */
-function getStreamUrl($channel_data) {
-    $config = getStalkerConfig();
-    $portal_url = getPortalUrl();
-    
-    if (!$config || !$portal_url) {
-        return '';
+function getPlayerStreamUrl($stream_id, $user_id = null) {
+    if (!$user_id && isset($_SESSION['user_id'])) {
+        $user_id = $_SESSION['user_id'];
     }
     
-    $stream_id = $channel_data['stream_id'];
+    // Kontrollo aksesin
+    if (!checkUserStreamAccess($user_id, $stream_id)) {
+        return false;
+    }
     
-    // Format Stalker standard
-    $stream_url = $portal_url . '/play/live.php?' . http_build_query([
-        'mac' => $config['mac_address'],
-        'stream' => $stream_id,
-        'extension' => 'm3u8',
-        'type' => 'm3u8'
-    ]);
+    // Merr informacion për stream
+    $stream_info = getStreamInfo($stream_id);
+    if (!$stream_info) {
+        return false;
+    }
+    
+    // Gjenero URL-në e stream-it
+    $stream_url = getLiveStreamUrl($stream_id);
+    
+    // Shto në history
+    addToStreamHistory($user_id, $stream_id, $stream_url);
+    
+    // Log request
+    logStreamRequest($stream_id, $user_id, getUserMacAddress());
     
     return $stream_url;
 }
