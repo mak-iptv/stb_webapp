@@ -1,14 +1,14 @@
 <?php
 require_once 'config.php';
-require_once 'includes/functions.php';
 
 // Kontrollo nëse useri është i loguar
-if (!isset($_SESSION['user'])) {
+if (!isset($_SESSION['user']) || !isset($_SESSION['portal_url']) || !isset($_SESSION['mac_address'])) {
     header('Location: /login');
     exit;
 }
 
 // Merr kanalet nga provideri
+require_once 'includes/functions.php';
 $channels = getChannelsFromProvider();
 $categories = array_unique(array_column($channels, 'category'));
 ?>
