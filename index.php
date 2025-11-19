@@ -1,4 +1,12 @@
 <?php
+// Render compatibility
+if (getenv('RENDER')) {
+    // Use Render's port
+    $port = getenv('PORT') ?: 10000;
+    if ($_SERVER['SERVER_PORT'] != $port) {
+        // Adjust if needed for URL generation
+    }
+}
 require_once 'config.php';
 require_once 'includes/functions.php';
 
@@ -28,7 +36,7 @@ $channels = getChannelsList();
                     Your browser does not support the video tag.
                 </video>
                 <div class="player-info">
-                    <h3 id="currentChannel">Zgjidhni një kanal</h3>
+                    <h3 id="currentChannel">Zgjidhni njÃ« kanal</h3>
                     <div class="player-controls">
                         <button id="playBtn">Play</button>
                         <button id="pauseBtn">Pause</button>
@@ -40,7 +48,7 @@ $channels = getChannelsList();
             <div class="channels-section">
                 <h3>Kanalet</h3>
                 <div class="search-box">
-                    <input type="text" id="searchChannel" placeholder="Kërko kanal...">
+                    <input type="text" id="searchChannel" placeholder="KÃ«rko kanal...">
                 </div>
                 <div class="channels-grid" id="channelsList">
                     <?php foreach ($channels as $channel): ?>
