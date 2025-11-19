@@ -1,34 +1,124 @@
 <?php
-function isLoggedIn() {
-    return isset($_SESSION['user']) && !empty($_SESSION['user']);
+function getChannelsFromProvider() {
+    $cache_file = CACHE_DIR . '/channels_cache.json';
+    $cache_time = 300; // 5 minutes
+    
+    // Check cache first
+    if (CACHE_ENABLED && file_exists($cache_file) && 
+        (time() - filemtime($cache_file)) < $cache_time) {
+        return json_decode(file_get_contents($cache_file), true);
+    }
+    
+    try {
+        // API call to your IPTV provider
+        $api_url = IPTV_PROVIDER_URL . '/player/api/channels.php';
+        
+        $post_data = [
+            'username' => IPTV_USERNAME,
+            'password' => IPTV_PASSWORD,
+            'mac' => IPTV_MAC_ADDRESS,
+            'type' => 'm3u_plus'
+        ];
+        
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $api_url,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => http_build_query($post_data),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_SSL_VERIFYPEER => false
+        ]);
+        
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($http_code === 200 && !empty($response)) {
+            $channels = parseM3UResponse($response);
+            
+            // Cache the result
+            if (CACHE_ENABLED) {
+                file_put_contents($cache_file, json_encode($channels));
+            }
+            
+            return $channels;
+        }
+        
+    } catch (Exception $e) {
+        error_log("Provider API Error: " . $e->getMessage());
+    }
+    
+    // Return demo channels if provider fails
+    return getDemoChannels();
 }
 
-function getUserMac() {
-    return $_SESSION['user_mac'] ?? DEFAULT_MAC;
+function parseM3UResponse($m3u_content) {
+    $channels = [];
+    $lines = explode("\n", $m3u_content);
+    
+    for ($i = 0; $i < count($lines); $i++) {
+        if (strpos($lines[$i], '#EXTINF:') === 0) {
+            $extinf = $lines[$i];
+            $stream_url = isset($lines[$i + 1]) ? trim($lines[$i + 1]) : '';
+            
+            // Extract channel name
+            preg_match('/#EXTINF:.*?,(.*)/', $extinf, $matches);
+            $channel_name = $matches[1] ?? 'Unknown Channel';
+            
+            // Extract logo if available
+            preg_match('/tvg-logo="(.*?)"/', $extinf, $logo_matches);
+            $logo = $logo_matches[1] ?? '';
+            
+            // Extract group
+            preg_match('/group-title="(.*?)"/', $extinf, $group_matches);
+            $category = $group_matches[1] ?? 'General';
+            
+            if (!empty($stream_url) && !empty($channel_name)) {
+                $channels[] = [
+                    'id' => count($channels) + 1,
+                    'name' => htmlspecialchars($channel_name),
+                    'category' => htmlspecialchars($category),
+                    'logo' => $logo,
+                    'stream_url' => $stream_url
+                ];
+            }
+        }
+    }
+    
+    return $channels;
 }
 
-function getChannelsList() {
-    // Kjo duhet të kthejë listën e kanaleve nga API ose database
-    // Për shembull:
+function getStreamUrl($channel_id, $channel_data) {
+    $token = generatePlayToken($channel_id);
+    
+    return IPTV_PROVIDER_URL . '/live/' . IPTV_USERNAME . '/' . IPTV_PASSWORD . '/' . $channel_id . '.ts?token=' . $token;
+    
+    // Ose nÃ«se provideri pÃ«rdor format tjetÃ«r:
+    // return IPTV_PROVIDER_URL . '/player/live.php?stream=' . $channel_id . '&extension=ts&play_token=' . $token;
+}
+
+function generatePlayToken($channel_id) {
+    return md5(IPTV_USERNAME . IPTV_PASSWORD . $channel_id . date('YmdH'));
+}
+
+function getDemoChannels() {
     return [
-        ['id' => '1', 'name' => 'RTSH 1', 'logo' => 'images/rtsh1.png'],
-        ['id' => '2', 'name' => 'RTSH 2', 'logo' => 'images/rtsh2.png'],
-        ['id' => '3', 'name' => 'Top Channel', 'logo' => 'images/top-channel.png'],
-        ['id' => '4', 'name' => 'Klan TV', 'logo' => 'images/klan.png'],
-        ['id' => '5', 'name' => 'Vizion Plus', 'logo' => 'images/vizion-plus.png'],
-        // Shtoni më shumë kanale sipas nevojës
+        ['id' => 1, 'name' => 'RTSH 1', 'category' => 'Lajme', 'logo' => '', 'stream_url' => ''],
+        ['id' => 2, 'name' => 'RTSH 2', 'category' => 'ArgÃ«tim', 'logo' => '', 'stream_url' => ''],
+        ['id' => 3, 'name' => 'Top Channel', 'category' => 'General', 'logo' => '', 'stream_url' => ''],
+        ['id' => 4, 'name' => 'Klan TV', 'category' => 'General', 'logo' => '', 'stream_url' => ''],
+        ['id' => 5, 'name' => 'Vizion Plus', 'category' => 'General', 'logo' => '', 'stream_url' => ''],
     ];
 }
 
-function generatePlayToken($mac, $channelId) {
-    // Implementimi i gjenerimit të token-it
-    // Kjo varet nga provideri juaj i IPTV
-    return md5($mac . $channelId . time() . 'secret_key');
-}
-
-function logActivity($activity) {
-    // Log user activities
-    $log = date('Y-m-d H:i:s') . " - " . $_SESSION['user'] . " - " . $activity . "\n";
-    file_put_contents('logs/activity.log', $log, FILE_APPEND);
+function verifyUserCredentials($username, $password) {
+    // KÃ«tu vendos kredencialet e vÃ«rteta tÃ« pÃ«rdoruesit
+    $valid_users = [
+        'demo' => 'demo', // PÃ«r testim
+        'username_your' => 'password_your' // PÃ«r providerin real
+    ];
+    
+    return isset($valid_users[$username]) && $valid_users[$username] === $password;
 }
 ?>
