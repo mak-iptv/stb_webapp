@@ -1,14 +1,12 @@
 services:
   - type: web
-    name: stb_webapp
-    env: php
+    name: stb-webapp
+    env: docker
     plan: free
-    buildCommand: |
-      chmod +x build-render.sh
-      ./build-render.sh
-    startCommand: php -S 0.0.0.0:$PORT
+    docker:
+      dockerfile: Dockerfile
     envVars:
+      - key: PORT
+        value: 10000
       - key: RENDER
         value: true
-      - key: PORT
-        generateValue: true
