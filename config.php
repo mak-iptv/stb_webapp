@@ -4,16 +4,11 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// PROVIDER CONFIG - NDRROJI KËTO!
-define('IPTV_PROVIDER_URL', 'http://testdi1.proxytx.cloud:80');
-define('IPTV_USERNAME', 'username_your');
-define('IPTV_PASSWORD', 'password_your'); 
-define('IPTV_MAC_ADDRESS', '00:1A:79:29:86:BB');
-
-// API Endpoints të providerit
-define('PROVIDER_API_CHANNELS', IPTV_PROVIDER_URL . '/player_api.php');
-define('PROVIDER_API_LIVE_STREAMS', IPTV_PROVIDER_URL . '/live/'. IPTV_USERNAME .'/'. IPTV_PASSWORD .'/');
-define('PROVIDER_API_EPG', IPTV_PROVIDER_URL . '/xmltv.php');
+// STALKER MIDDLEWARE CONFIG - NDRROJI KËTO!
+define('STALKER_PORTAL_URL', 'http://testdi1.proxytx.cloud:80');
+define('STALKER_MAC_ADDRESS', '00:1A:79:29:86:BB');
+define('STALKER_USERNAME', 'username_your');
+define('STALKER_PASSWORD', 'password_your');
 
 // Application configuration
 define('BASE_URL', 'https://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
