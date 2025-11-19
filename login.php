@@ -1,48 +1,67 @@
 <?php
 require_once 'config.php';
+require_once 'includes/functions.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
     
-    // Verifikimi i kredencialeve (duhet të implementohet sipas nevojës)
-    if (verifyCredentials($username, $password)) {
+    if (verifyUserCredentials($username, $password)) {
         $_SESSION['user'] = $username;
-        $_SESSION['user_mac'] = $_POST['mac'] ?? DEFAULT_MAC;
+        $_SESSION['login_time'] = time();
         
-        header("Location: index.php");
+        // Ruaj kredencialet pÃ«r provider nÃ«se janÃ« ato reale
+        if ($username !== 'demo') {
+            $_SESSION['provider_username'] = $username;
+            $_SESSION['provider_password'] = $password;
+        }
+        
+        header('Location: /dashboard');
         exit;
     } else {
-        $error = "Kredenciale të gabuara";
+        $error = "Kredencialet janÃ« tÃ« gabuara!";
     }
 }
-
-function verifyCredentials($username, $password) {
-    // Implementimi aktual i verifikimit
-    // Mund të jetë nga database, API, etj.
-    return !empty($username) && !empty($password);
-}
 ?>
+
 <!DOCTYPE html>
 <html lang="sq">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Stalker Player</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
     <div class="login-container">
         <div class="login-form">
-            <h2>Hyrë në Stalker Player</h2>
+            <h1>ğŸ” HyrÃ« nÃ« Stalker Player</h1>
+            
             <?php if (isset($error)): ?>
-                <div class="error-message"><?= $error ?></div>
+                <div class="error-message">
+                    <?= htmlspecialchars($error) ?>
+                </div>
             <?php endif; ?>
+            
             <form method="POST">
-                <input type="text" name="username" placeholder="Emri i përdoruesit" required>
-                <input type="password" name="password" placeholder="Fjalëkalimi" required>
-                <input type="text" name="mac" placeholder="MAC Address" value="<?= DEFAULT_MAC ?>">
-                <button type="submit">Hyr</button>
+                <div class="form-group">
+                    <label for="username">Emri i pÃ«rdoruesit:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">FjalÃ«kalimi:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                
+                <button type="submit" class="login-btn">Hyr</button>
             </form>
+            
+            <div class="demo-info">
+                <strong>Kredenciale testimi:</strong><br>
+                PÃ«rdoruesi: demo<br>
+                FjalÃ«kalimi: demo
+            </div>
         </div>
     </div>
 </body>
