@@ -1,12 +1,14 @@
 services:
   - type: web
-    name: stb_webapp
+    name: stalker-player
     env: php
     plan: free
-    buildCommand: chmod +x build.sh && ./build.sh
-    startCommand: php -S 0.0.0.0:10000
+    buildCommand: |
+      chmod +x build-render.sh
+      ./build-render.sh
+    startCommand: php -S 0.0.0.0:$PORT
     envVars:
       - key: RENDER
         value: true
-      - key: PHP_VERSION
-        value: 8.1
+      - key: PORT
+        generateValue: true
