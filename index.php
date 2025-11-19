@@ -1,5 +1,8 @@
 <?php
-session_start();
+// Start session vetëm nëse nuk është startuar
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Përcakto faqen bazuar në query parameter
 $page = $_GET['page'] ?? 'home';
