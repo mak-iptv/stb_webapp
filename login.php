@@ -1,6 +1,12 @@
 <?php
 require_once 'config.php';
 
+// Nëse useri është tashmë i loguar, shko direkt në dashboard
+if (isset($_SESSION['user']) && isset($_SESSION['portal_url']) && isset($_SESSION['mac_address'])) {
+    header('Location: /dashboard');
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $portal_url = $_POST['portal_url'] ?? '';
     $portal_port = $_POST['portal_port'] ?? '';
@@ -22,7 +28,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['login_time'] = time();
         
         // Testo lidhjen me providerin
-        if (testProviderConnection()) {
+        require_once 'includes/functions.php';
+        $channels = getChannelsFromProvider(true); // force refresh
+        
+        if (!empty($channels)) {
             header('Location: /dashboard');
             exit;
         } else {
@@ -32,15 +41,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   $_SESSION['username'], $_SESSION['password'], $_SESSION['user']);
         }
     }
-}
-
-/**
- * Testo lidhjen me providerin
- */
-function testProviderConnection() {
-    require_once 'includes/functions.php';
-    $channels = getChannelsFromProvider(true); // force refresh
-    return !empty($channels);
 }
 ?>
 
@@ -80,11 +80,6 @@ function testProviderConnection() {
             text-align: center;
             margin-bottom: 30px;
             color: #333;
-        }
-        
-        .login-title h1 {
-            margin-bottom: 10px;
-            color: #2c3e50;
         }
         
         .form-group {
@@ -134,10 +129,6 @@ function testProviderConnection() {
             margin-top: 10px;
         }
         
-        .login-btn:hover {
-            background: #2980b9;
-        }
-        
         .error-message {
             background: #f8d7da;
             color: #721c24;
@@ -147,18 +138,14 @@ function testProviderConnection() {
             text-align: center;
         }
         
-        .info-message {
-            background: #d1ecf1;
-            color: #0c5460;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+        .back-link {
             text-align: center;
-            font-size: 14px;
+            margin-top: 20px;
         }
         
-        .required {
-            color: #e74c3c;
+        .back-link a {
+            color: #3498db;
+            text-decoration: none;
         }
     </style>
 </head>
@@ -166,7 +153,7 @@ function testProviderConnection() {
     <div class="login-container">
         <div class="login-title">
             <h1>🔐 Stalker Player</h1>
-            <p>Konfiguro lidhjen me providerin tuaj</p>
+            <p>Konfiguro lidhjen me providerin</p>
         </div>
         
         <?php if (isset($error)): ?>
@@ -175,46 +162,36 @@ function testProviderConnection() {
             </div>
         <?php endif; ?>
         
-        <div class="info-message">
-            <strong>💡 Informacion:</strong> Shkruani të dhënat e providerit tuaj IPTV
-        </div>
-        
         <form method="POST">
-            <!-- Provider Settings -->
             <div class="form-row">
                 <div class="form-group">
-                    <label for="portal_url">URL e Portalit <span class="required">*</span></label>
+                    <label for="portal_url">URL e Portalit *</label>
                     <input type="text" id="portal_url" name="portal_url" 
-                           placeholder="http://portal-provider.com" 
-                           value="<?= htmlspecialchars($_POST['portal_url'] ?? '') ?>" required>
+                           placeholder="http://portal-provider.com" required>
                 </div>
                 
                 <div class="form-group">
                     <label for="portal_port">Porti</label>
                     <input type="number" id="portal_port" name="portal_port" 
-                           placeholder="80 (default)" 
-                           value="<?= htmlspecialchars($_POST['portal_port'] ?? '') ?>">
+                           placeholder="80 (default)" value="80">
                 </div>
             </div>
             
             <div class="form-group">
-                <label for="mac_address">MAC Address <span class="required">*</span></label>
+                <label for="mac_address">MAC Address *</label>
                 <input type="text" id="mac_address" name="mac_address" 
-                       placeholder="00:1A:79:XX:XX:XX" 
-                       value="<?= htmlspecialchars($_POST['mac_address'] ?? '') ?>" required>
+                       placeholder="00:1A:79:XX:XX:XX" required>
             </div>
             
-            <!-- User Credentials -->
             <div class="form-row">
                 <div class="form-group">
-                    <label for="username">Username <span class="required">*</span></label>
+                    <label for="username">Username *</label>
                     <input type="text" id="username" name="username" 
-                           placeholder="Emri i përdoruesit" 
-                           value="<?= htmlspecialchars($_POST['username'] ?? '') ?>" required>
+                           placeholder="Emri i përdoruesit" required>
                 </div>
                 
                 <div class="form-group">
-                    <label for="password">Password <span class="required">*</span></label>
+                    <label for="password">Password *</label>
                     <input type="password" id="password" name="password" 
                            placeholder="Fjalëkalimi" required>
                 </div>
@@ -223,10 +200,8 @@ function testProviderConnection() {
             <button type="submit" class="login-btn">🔗 Lidhu me Providerin</button>
         </form>
         
-        <div style="margin-top: 20px; text-align: center; color: #666; font-size: 12px;">
-            <p><strong>Format i pritshëm:</strong></p>
-            <p>URL: http://portal.iptvprovider.com</p>
-            <p>MAC: 00:1A:79:XX:XX:XX</p>
+        <div class="back-link">
+            <a href="/">← Kthehu në Faqen Kryesore</a>
         </div>
     </div>
 </body>
