@@ -28,8 +28,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['mac_address'] = $mac_address;
         $_SESSION['user'] = 'provider_user'; // User fixed
         
-        // Testo lidhjen me providerin
-        require_once 'includes/functions.php';
+        // Testo lidhjen me providerin - përdor include_once
+        include_once 'includes/functions.php';
         $channels = getChannelsFromProvider(true);
         
         if (!empty($channels)) {
