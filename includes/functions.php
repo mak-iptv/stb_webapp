@@ -2,128 +2,143 @@
 // includes/functions.php
 
 /**
- * Funksione për Stalker Middleware - Streaming Live
+ * Funksione të thjeshtuara për Stalker Player
+ * Vetëm URL dhe MAC address
  */
 
-/**
- * Gjeneron URL për streaming live
- */
-function generateLiveStreamUrl($mac, $stream_id, $extension = 'ts', $play_token = null, $sn2 = null) {
-    $base_url = "https://your-stalker-domain.com/play/live.php";
+class StalkerPlayer {
+    private $portal_url;
+    private $user_mac;
     
-    $params = [
-        'mac' => $mac,
-        'stream' => $stream_id,
-        'extension' => $extension
-    ];
-    
-    // Shto play_token nëse ekziston
-    if ($play_token) {
-        $params['play_token'] = $play_token;
+    public function __construct($portal_url, $user_mac = null) {
+        $this->portal_url = rtrim($portal_url, '/');
+        $this->user_mac = $user_mac ?: $this->getUserMac();
     }
     
-    // Shto sn2 nëse ekziston
-    if ($sn2) {
-        $params['sn2'] = $sn2;
+    /**
+     * Merr MAC address të përdoruesit
+     */
+    private function getUserMac() {
+        // Provoni në këtë renditje:
+        
+        // 1. Nga session
+        if (isset($_SESSION['user_mac'])) {
+            return $_SESSION['user_mac'];
+        }
+        
+        // 2. Nga cookie
+        if (isset($_COOKIE['user_mac'])) {
+            return $_COOKIE['user_mac'];
+        }
+        
+        // 3. Gjenero një të re dhe ruaj
+        $new_mac = $this->generateMacAddress();
+        $_SESSION['user_mac'] = $new_mac;
+        setcookie('user_mac', $new_mac, time() + (86400 * 30), "/"); // 30 ditë
+        
+        return $new_mac;
     }
     
-    return $base_url . '?' . http_build_query($params);
-}
-
-/**
- * Verifikon MAC address formatin
- */
-function isValidMacAddress($mac) {
-    return preg_match('/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/', $mac);
-}
-
-/**
- * Merr stream URL nga database ose API
- */
-function getLiveStreamUrl($stream_id, $user_mac = null) {
-    // Nëse nuk ka MAC, përdor default ose gjenero
-    if (!$user_mac) {
-        $user_mac = getUserMacAddress();
+    /**
+     * Gjeneron MAC address unike
+     */
+    private function generateMacAddress() {
+        // Gjeneron MAC në formatin: 00:1A:79:XX:XX:XX
+        $prefix = "00:1A:79";
+        $suffix = [];
+        for ($i = 0; $i < 3; $i++) {
+            $suffix[] = sprintf('%02X', mt_rand(0, 255));
+        }
+        return $prefix . ':' . implode(':', $suffix);
     }
     
-    // Merr play_token nga session ose database
-    $play_token = getPlayToken($stream_id);
-    
-    // Merr sn2 nëse nevojitet
-    $sn2 = getSerialNumber();
-    
-    return generateLiveStreamUrl($user_mac, $stream_id, 'ts', $play_token, $sn2);
-}
-
-/**
- * Merr MAC address të përdoruesit
- */
-function getUserMacAddress() {
-    // Mund të merret nga session, database, ose gjenerohet
-    if (isset($_SESSION['user_mac'])) {
-        return $_SESSION['user_mac'];
+    /**
+     * Kontrollon nëse MAC address është valide
+     */
+    public function isValidMac($mac) {
+        return preg_match('/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/', $mac);
     }
     
-    // Ose gjenero një MAC të rastësishëm për përdoruesin
-    return generateRandomMac();
-}
-
-/**
- * Gjeneron MAC address të rastësishme
- */
-function generateRandomMac() {
-    $mac = [];
-    for ($i = 0; $i < 6; $i++) {
-        $mac[] = sprintf('%02X', mt_rand(0, 255));
-    }
-    return implode(':', $mac);
-}
-
-/**
- * Merr play token për stream
- */
-function getPlayToken($stream_id) {
-    // Kjo mund të jetë nga session, database, ose API call
-    if (isset($_SESSION['play_tokens'][$stream_id])) {
-        return $_SESSION['play_tokens'][$stream_id];
+    /**
+     * Gjeneron URL për streaming live
+     */
+    public function generateLiveUrl($stream_id, $extension = 'ts') {
+        if (!$this->isValidMac($this->user_mac)) {
+            throw new Exception("MAC address jo valide: " . $this->user_mac);
+        }
+        
+        $params = [
+            'mac' => $this->user_mac,
+            'stream' => $stream_id,
+            'extension' => $extension
+        ];
+        
+        return $this->portal_url . '/play/live.php?' . http_build_query($params);
     }
     
-    // Ose gjenero një token të ri
-    return generatePlayToken($stream_id);
-}
-
-/**
- * Gjeneron play token
- */
-function generatePlayToken($stream_id) {
-    $token = md5($stream_id . time() . uniqid());
-    
-    // Ruaj në session për përdorim të mëvonshëm
-    if (!isset($_SESSION['play_tokens'])) {
-        $_SESSION['play_tokens'] = [];
+    /**
+     * Gjeneron URL për VOD
+     */
+    public function generateVodUrl($video_id, $extension = 'ts') {
+        $params = [
+            'mac' => $this->user_mac,
+            'stream' => $video_id,
+            'extension' => $extension
+        ];
+        
+        return $this->portal_url . '/play/vod.php?' . http_build_query($params);
     }
-    $_SESSION['play_tokens'][$stream_id] = $token;
     
-    return $token;
+    /**
+     * Merr URL bazë të portalit
+     */
+    public function getPortalUrl() {
+        return $this->portal_url;
+    }
+    
+    /**
+     * Merr MAC address aktuale
+     */
+    public function getMacAddress() {
+        return $this->user_mac;
+    }
+    
+    /**
+     * Vendos MAC address të re
+     */
+    public function setMacAddress($new_mac) {
+        if ($this->isValidMac($new_mac)) {
+            $this->user_mac = $new_mac;
+            $_SESSION['user_mac'] = $new_mac;
+            setcookie('user_mac', $new_mac, time() + (86400 * 30), "/");
+            return true;
+        }
+        return false;
+    }
 }
 
 /**
- * Merr serial number (sn2)
+ * Funksion i thjeshtë për të krijuar player URL
  */
-function getSerialNumber() {
-    // Mund të jetë nga konfigurimi ose database
-    return defined('STB_SERIAL') ? STB_SERIAL : 'default_sn';
+function createStalkerStreamUrl($portal_url, $stream_id, $mac = null, $type = 'live') {
+    $player = new StalkerPlayer($portal_url, $mac);
+    
+    if ($type === 'live') {
+        return $player->generateLiveUrl($stream_id);
+    } else {
+        return $player->generateVodUrl($stream_id);
+    }
 }
 
 /**
- * Kontrollon nëse stream-i është i disponueshëm
+ * Kontrollon nëse stream-i është aktiv
  */
-function checkStreamAvailability($stream_url) {
+function checkStreamStatus($stream_url, $timeout = 5) {
     $ch = curl_init();
     curl_setopt_array($ch, [
         CURLOPT_URL => $stream_url,
         CURLOPT_NOBODY => true,
-        CURLOPT_TIMEOUT => 10,
+        CURLOPT_TIMEOUT => $timeout,
         CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_RETURNTRANSFER => true
     ]);
@@ -132,126 +147,56 @@ function checkStreamAvailability($stream_url) {
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
     
-    return ($http_code === 200);
+    return $http_code === 200;
 }
 
 /**
- * Merr informacion për stream nga database
+ * Merr listën e kanaleve nga API (nëse është e disponueshme)
  */
-function getStreamInfo($stream_id) {
-    global $pdo;
+function getChannelsList($portal_url, $mac = null) {
+    $player = new StalkerPlayer($portal_url, $mac);
     
-    try {
-        $stmt = $pdo->prepare("SELECT * FROM streams WHERE stream_id = ?");
-        $stmt->execute([$stream_id]);
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        error_log("Database error getting stream info: " . $e->getMessage());
-        return false;
+    // Kjo varet nga API e provider-it tuaj
+    $api_url = $portal_url . '/api/channels.php?mac=' . $player->getMacAddress();
+    
+    $response = @file_get_contents($api_url);
+    if ($response) {
+        return json_decode($response, true);
     }
+    
+    return [];
 }
 
 /**
- * Log stream request për analizë
+ * Shfaq player HTML
  */
-function logStreamRequest($stream_id, $user_id, $mac, $success = true) {
-    global $pdo;
+function displayStalkerPlayer($stream_url, $width = "100%", $height = "400px") {
+    $html = '
+    <div class="stalker-player">
+        <video controls style="width: ' . $width . '; height: ' . $height . ';">
+            <source src="' . htmlspecialchars($stream_url) . '" type="video/mp2t">
+            Shfletuesi juaj nuk mbështet video player-in.
+        </video>
+        <div class="player-info">
+            <small>Stream URL: ' . htmlspecialchars($stream_url) . '</small>
+        </div>
+    </div>';
     
-    try {
-        $stmt = $pdo->prepare("
-            INSERT INTO stream_logs 
-            (stream_id, user_id, mac_address, success, created_at) 
-            VALUES (?, ?, ?, ?, NOW())
-        ");
-        $stmt->execute([$stream_id, $user_id, $mac, $success]);
-    } catch (PDOException $e) {
-        error_log("Error logging stream request: " . $e->getMessage());
-    }
+    return $html;
 }
 
 /**
- * Merr listën e stream-eve live të disponueshme
+ * Funksion i thjeshtë për konfigurim
  */
-function getAvailableLiveStreams($category_id = null) {
-    global $pdo;
-    
-    try {
-        $sql = "SELECT * FROM streams WHERE type = 'live' AND status = 'active'";
-        $params = [];
-        
-        if ($category_id) {
-            $sql .= " AND category_id = ?";
-            $params[] = $category_id;
-        }
-        
-        $sql .= " ORDER BY stream_name ASC";
-        
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        error_log("Database error getting live streams: " . $e->getMessage());
-        return [];
-    }
+function getStalkerConfig() {
+    return [
+        'portal_url' => 'https://stb-webapp.onrender.com', // Ndryshoje këtë
+        'default_mac' => isset($_SESSION['user_mac']) ? $_SESSION['user_mac'] : null
+    ];
 }
 
-/**
- * Kontrollon aksesin e përdoruesit në stream
- */
-function checkUserStreamAccess($user_id, $stream_id) {
-    // Implementoni logjikën e aksesit tuaj këtu
-    // Mund të kontrolloni nëse përdoruesi ka abonim, nëse stream-i është i lirë, etj.
-    
-    return true; // Ose false nëse nuk ka akses
-}
-
-/**
- * Ruan stream në history të përdoruesit
- */
-function addToStreamHistory($user_id, $stream_id, $stream_url) {
-    global $pdo;
-    
-    try {
-        $stmt = $pdo->prepare("
-            INSERT INTO user_stream_history 
-            (user_id, stream_id, stream_url, watched_at) 
-            VALUES (?, ?, ?, NOW())
-            ON DUPLICATE KEY UPDATE watched_at = NOW()
-        ");
-        $stmt->execute([$user_id, $stream_id, $stream_url]);
-    } catch (PDOException $e) {
-        error_log("Error adding to stream history: " . $e->getMessage());
-    }
-}
-
-/**
- * Merr stream URL të përgatitur për player
- */
-function getPlayerStreamUrl($stream_id, $user_id = null) {
-    if (!$user_id && isset($_SESSION['user_id'])) {
-        $user_id = $_SESSION['user_id'];
-    }
-    
-    // Kontrollo aksesin
-    if (!checkUserStreamAccess($user_id, $stream_id)) {
-        return false;
-    }
-    
-    // Merr informacion për stream
-    $stream_info = getStreamInfo($stream_id);
-    if (!$stream_info) {
-        return false;
-    }
-    
-    // Gjenero URL-në e stream-it
-    $stream_url = getLiveStreamUrl($stream_id);
-    
-    // Shto në history
-    addToStreamHistory($user_id, $stream_id, $stream_url);
-    
-    // Log request
-    logStreamRequest($stream_id, $user_id, getUserMacAddress());
-    
-    return $stream_url;
+// Initialize session nëse nuk është startuar
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 ?>
