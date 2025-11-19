@@ -16,13 +16,13 @@ COPY . .
 RUN chmod -R 755 . && \
     chmod 777 logs cache
 
-# Configure Apache for Render
-COPY apache.conf /etc/apache2/sites-available/000-default.conf
+# Configure Apache to use port 10000 (Render's expected port)
+RUN echo "Listen 10000" > /etc/apache2/ports.conf
 
-# Use PORT environment variable
-RUN echo "Listen ${PORT}" > /etc/apache2/ports.conf
+# Copy Apache configuration
+COPY apache.conf /etc/apache2/sites-available/000-default.conf
 
 EXPOSE 10000
 
 # Start Apache
-CMD ["sh", "-c", "sed -i 's/\\${PORT}/'\"$PORT\"'/g' /etc/apache2/ports.conf && apache2-foreground"]
+CMD ["apache2-foreground"]
