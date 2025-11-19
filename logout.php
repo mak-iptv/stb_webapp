@@ -1,7 +1,7 @@
 <?php
 require_once 'config.php';
 
-// Fshi session
+// Fshi të gjitha të dhënat e session
 $_SESSION = array();
 
 // Fshi cookie-in e session
