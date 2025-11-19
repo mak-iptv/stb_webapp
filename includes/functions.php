@@ -32,7 +32,6 @@ function getChannelsFromStalker() {
             'type' => 'stb',
             'action' => 'get_all_channels',
             'mac' => STALKER_MAC_ADDRESS,
-            'auth' => md5(STALKER_USERNAME . STALKER_PASSWORD),
             'JsHttpRequest' => '1-xml'
         ];
         
@@ -43,23 +42,34 @@ function getChannelsFromStalker() {
             CURLOPT_POSTFIELDS => http_build_query($post_data),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 10,
-            CURLOPT_USERAGENT => 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
+            CURLOPT_USERAGENT => 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3',
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/x-www-form-urlencoded',
+                'Referer: ' . STALKER_PORTAL_URL . '/c/'
+            ]
         ]);
         
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error = curl_error($ch);
         curl_close($ch);
         
         if ($http_code !== 200 || empty($response)) {
-            error_log("Stalker API Error: HTTP $http_code");
+            error_log("Stalker API Error: HTTP $http_code - $curl_error");
             return [];
         }
         
         // Parse JSON response
         $data = json_decode($response, true);
         
-        if (json_last_error() !== JSON_ERROR_NONE || empty($data['js']['data'])) {
+        if (json_last_error() !== JSON_ERROR_NONE) {
             error_log("Stalker JSON Error: " . json_last_error_msg());
+            return [];
+        }
+        
+        // Kontrollo strukturën e përgjigjes
+        if (empty($data['js']['data'])) {
+            error_log("Stalker API: No channels data found");
             return [];
         }
         
@@ -73,7 +83,6 @@ function getChannelsFromStalker() {
                     'number' => $channel['number'] ?? 0,
                     'category' => $channel['cat_name'] ?? $channel['category'] ?? 'General',
                     'logo' => getStalkerLogoUrl($channel['logo'] ?? $channel['tv_icon_url'] ?? ''),
-                    'stream_url' => '',
                     'cmd' => $channel['cmd'] ?? '',
                     'is_radio' => $channel['is_radio'] ?? 0
                 ];
@@ -113,7 +122,7 @@ function getStalkerLogoUrl($logo_path) {
 function getStreamUrl($channel_data) {
     $stream_id = $channel_data['stream_id'];
     
-    // Format Stalker: play/live.php?mac=MAC&stream=STREAM_ID&extension=ts
+    // Format Stalker i saktë sipas shembullit tënd
     $stream_url = STALKER_PORTAL_URL . '/play/live.php?' . http_build_query([
         'mac' => STALKER_MAC_ADDRESS,
         'stream' => $stream_id,
@@ -126,8 +135,9 @@ function getStreamUrl($channel_data) {
 }
 
 function generateStalkerToken($stream_id) {
+    // Gjenero token sipas algoritmit të Stalker
     $timestamp = time();
-    $token_data = STALKER_MAC_ADDRESS . $stream_id . $timestamp . STALKER_PASSWORD;
+    $token_data = STALKER_USERNAME . STALKER_PASSWORD . $stream_id . $timestamp;
     return md5($token_data);
 }
 
@@ -138,7 +148,8 @@ function testStalkerConnection() {
         return [
             'success' => !empty($channels),
             'channels_count' => count($channels),
-            'channels_sample' => array_slice($channels, 0, 3)
+            'channels_sample' => array_slice($channels, 0, 5),
+            'api_url' => STALKER_PORTAL_URL . '/server/load.php'
         ];
     } catch (Exception $e) {
         return [
@@ -151,7 +162,7 @@ function testStalkerConnection() {
 function getDemoChannels() {
     return [
         [
-            'id' => 1, 
+            'id' => 9356, 
             'stream_id' => 9356, 
             'name' => 'RTSH 1', 
             'number' => 1,
@@ -160,7 +171,7 @@ function getDemoChannels() {
             'cmd' => '1'
         ],
         [
-            'id' => 2, 
+            'id' => 9357, 
             'stream_id' => 9357, 
             'name' => 'RTSH 2', 
             'number' => 2,
@@ -169,7 +180,7 @@ function getDemoChannels() {
             'cmd' => '2'
         ],
         [
-            'id' => 3, 
+            'id' => 1234, 
             'stream_id' => 1234, 
             'name' => 'Top Channel', 
             'number' => 3,
