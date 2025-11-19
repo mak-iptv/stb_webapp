@@ -15,7 +15,9 @@ try {
     
     echo json_encode([
         'success' => true,
-        'channels' => $channels
+        'channels' => $channels,
+        'total' => count($channels),
+        'provider' => IPTV_PROVIDER_URL
     ]);
     
 } catch (Exception $e) {
