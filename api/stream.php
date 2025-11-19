@@ -4,47 +4,59 @@ require_once '../includes/functions.php';
 
 header('Content-Type: application/json');
 
-if (!isLoggedIn()) {
+if (!isset($_SESSION['user'])) {
+    http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Jo i autorizuar']);
     exit;
 }
 
 if (!isset($_GET['channel_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Channel ID nuk është specifikuar']);
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Channel ID kÃ«rkohet']);
     exit;
 }
 
-$channelId = $_GET['channel_id'];
-$userMac = getUserMac(); // Merr MAC nga session ose database
+$channel_id = intval($_GET['channel_id']);
 
 try {
-    // Gjenero token (në varësi të implementimit të serverit)
-    $token = generatePlayToken($userMac, $channelId);
+    // Merr tÃ« gjitha kanalet pÃ«r tÃ« gjetur stream URL
+    $channels = getChannelsFromProvider();
+    $channel_data = null;
     
-    // Ndërto URL-në e stream-it
-    $streamUrl = API_BASE_URL . "/player/live.php?" . http_build_query([
-        'mac' => $userMac,
-        'stream' => $channelId,
-        'extension' => 'ts',
-        'play_token' => $token,
-        'type' => 'm3u8' // Ose ts direkt
-    ]);
+    foreach ($channels as $channel) {
+        if ($channel['id'] == $channel_id) {
+            $channel_data = $channel;
+            break;
+        }
+    }
     
-    // Për MPEG-TS direkt, përdor HLS wrapper
-    $hlsStreamUrl = "api/hls_proxy.php?" . http_build_query([
-        'stream_url' => base64_encode($streamUrl)
-    ]);
-    
-    echo json_encode([
-        'success' => true,
-        'stream_url' => $hlsStreamUrl,
-        'channel_id' => $channelId
-    ]);
+    if ($channel_data && !empty($channel_data['stream_url'])) {
+        $stream_url = $channel_data['stream_url'];
+        
+        // NÃ«se provideri kÃ«rkon token
+        if (strpos($stream_url, 'token') === false) {
+            $stream_url .= '?token=' . generatePlayToken($channel_id);
+        }
+        
+        echo json_encode([
+            'success' => true,
+            'stream_url' => $stream_url,
+            'channel_id' => $channel_id,
+            'channel_name' => $channel_data['name']
+        ]);
+    } else {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Stream nuk u gjet pÃ«r kÃ«tÃ« kanal'
+        ]);
+    }
     
 } catch (Exception $e) {
+    error_log("Stream API Error: " . $e->getMessage());
+    
     echo json_encode([
         'success' => false,
-        'message' => 'Gabim në gjenerimin e stream: ' . $e->getMessage()
+        'message' => 'Gabim nÃ« marrjen e stream-it'
     ]);
 }
 ?>
