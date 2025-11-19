@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: stalker-player
+    name: stb_webapp
     env: php
     plan: free
     buildCommand: |
