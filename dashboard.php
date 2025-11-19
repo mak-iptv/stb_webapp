@@ -240,9 +240,13 @@ $channels = getChannelsFromProvider();
         </div>
 <div class="channel-card" 
      data-channel-id="<?= $channel['id'] ?>" 
-     data-stream-id="<?= $channel['stream_id'] ?? $channel['id'] ?>"
+     data-stream-id="<?= $channel['stream_id'] ?>"
      data-channel-name="<?= htmlspecialchars($channel['name']) ?>" 
      data-category="<?= htmlspecialchars($channel['category']) ?>">
+    
+    <?php if (isset($channel['number'])): ?>
+        <div class="channel-number"><?= $channel['number'] ?></div>
+    <?php endif; ?>
     
     <div class="channel-logo">
         <?php if (!empty($channel['logo'])): ?>
@@ -255,11 +259,9 @@ $channels = getChannelsFromProvider();
     <div class="channel-info">
         <h4><?= htmlspecialchars($channel['name']) ?></h4>
         <div class="channel-category"><?= htmlspecialchars($channel['category']) ?></div>
-        <?php if (isset($channel['stream_id'])): ?>
-            <div class="stream-id" style="font-size: 10px; color: #888; margin-top: 5px;">
-                ID: <?= $channel['stream_id'] ?>
-            </div>
-        <?php endif; ?>
+        <div class="stream-id" style="font-size: 10px; color: #888; margin-top: 5px;">
+            ID: <?= $channel['stream_id'] ?>
+        </div>
     </div>
 </div>
         <!-- Channels Section -->
