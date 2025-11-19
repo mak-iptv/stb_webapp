@@ -2,11 +2,7 @@
 // includes/functions.php
 
 /**
- * Funksione për Stalker Player
- */
-
-/**
- * Merr listen e kanaleve nga provider-i
+ * Merr listen e të gjitha kanaleve nga provider-i aktual
  */
 function getChannelsFromProvider($portal_url, $mac_address = null) {
     // Nëse nuk ka MAC, gjenero një
@@ -14,39 +10,68 @@ function getChannelsFromProvider($portal_url, $mac_address = null) {
         $mac_address = generateMacAddress();
     }
     
-    // Provoni API të ndryshme endpoint-et e zakonshme të Stalker Portal
+    // Endpoint-et e zakonshme për Stalker Portal
     $endpoints = [
         '/api/channels.php',
         '/api/get_channels.php', 
         '/api/live.php',
-        '/portal.php?type=itv'
+        '/portal.php?type=itv',
+        '/server/load.php',
+        '/panel_api.php'
     ];
     
+    // Provoni çdo endpoint
     foreach ($endpoints as $endpoint) {
         $api_url = rtrim($portal_url, '/') . $endpoint . '?mac=' . $mac_address;
         
         $channels = tryApiCall($api_url);
-        if ($channels) {
+        if ($channels && count($channels) > 4) { // Nëse ka më shumë se 4 kanale
+            error_log("U gjetën " . count($channels) . " kanale nga: " . $api_url);
             return $channels;
         }
     }
     
-    // Nëse të gjitha API-t dështojnë, kthe kanale demo
+    // Nëse nuk u gjetën kanale, provo metoda alternative
+    return tryAlternativeMethods($portal_url, $mac_address);
+}
+
+/**
+ * Metoda alternative për marrjen e kanaleve
+ */
+function tryAlternativeMethods($portal_url, $mac_address) {
+    // Metoda 1: Provoni me POST request
+    $channels = tryPostRequest($portal_url, $mac_address);
+    if ($channels) return $channels;
+    
+    // Metoda 2: Provoni të merrni nga index file
+    $channels = tryIndexFile($portal_url, $mac_address);
+    if ($channels) return $channels;
+    
+    // Metoda 3: Kthe kanale demo POR me mesazh
+    error_log("Nuk u gjetën kanale nga provider-i. Duke përdorur kanale demo.");
+    $_SESSION['using_demo_channels'] = true;
     return getDemoChannels();
 }
 
 /**
- * Provon të bëjë thirrje API
+ * Provon POST request për kanale
  */
-function tryApiCall($api_url) {
+function tryPostRequest($portal_url, $mac_address) {
+    $post_data = [
+        'mac' => $mac_address,
+        'type' => 'itv',
+        'action' => 'get_channels'
+    ];
+    
     $ch = curl_init();
     curl_setopt_array($ch, [
-        CURLOPT_URL => $api_url,
+        CURLOPT_URL => rtrim($portal_url, '/') . '/api/',
         CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => http_build_query($post_data),
         CURLOPT_TIMEOUT => 10,
         CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_USERAGENT => 'Mozilla/5.0 (compatible; StalkerClient)'
+        CURLOPT_SSL_VERIFYPEER => false
     ]);
     
     $response = curl_exec($ch);
@@ -55,13 +80,8 @@ function tryApiCall($api_url) {
     
     if ($http_code === 200 && !empty($response)) {
         $data = json_decode($response, true);
-        if (json_last_error() === JSON_ERROR_NONE && !empty($data)) {
+        if (!empty($data)) {
             return $data;
-        }
-        
-        // Provo të parse-sh si XML nëse JSON dështon
-        if (strpos($response, '<?xml') !== false) {
-            return parseXmlChannels($response);
         }
     }
     
@@ -69,170 +89,117 @@ function tryApiCall($api_url) {
 }
 
 /**
- * Parse XML response për kanale
+ * Provon të marrë kanale nga index file
  */
-function parseXmlChannels($xml_string) {
-    try {
-        $xml = simplexml_load_string($xml_string);
-        $channels = [];
+function tryIndexFile($portal_url, $mac_address) {
+    $index_url = rtrim($portal_url, '/') . '/index.php?mac=' . $mac_address;
+    
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $index_url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 10,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_COOKIEFILE => '' // Enable cookies
+    ]);
+    
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    // Nëse kthen JSON, process-it
+    if ($http_code === 200) {
+        $data = json_decode($response, true);
+        if (json_last_error() === JSON_ERROR_NONE && !empty($data)) {
+            return $data;
+        }
         
-        if ($xml && isset($xml->channel)) {
-            foreach ($xml->channel as $channel) {
+        // Nëse është HTML, provo të extract-ish kanalet
+        return extractChannelsFromHtml($response);
+    }
+    
+    return false;
+}
+
+/**
+ * Extract kanalet nga HTML response
+ */
+function extractChannelsFromHtml($html) {
+    // Ky është një regex i thjeshtë për të gjetur kanale në HTML
+    preg_match_all('/data-channel-id=["\'](\d+)["\']|channel.*?["\'](\d+)["\']/i', $html, $matches);
+    
+    if (!empty($matches[1])) {
+        $channels = [];
+        foreach ($matches[1] as $channel_id) {
+            if (!empty($channel_id)) {
                 $channels[] = [
-                    'id' => (string)$channel->id,
-                    'name' => (string)$channel->name,
-                    'stream_id' => (string)$channel->stream_id,
-                    'category' => (string)$channel->category,
-                    'logo' => (string)$channel->logo
+                    'id' => $channel_id,
+                    'name' => 'Channel ' . $channel_id,
+                    'stream_id' => $channel_id,
+                    'category' => 'General'
                 ];
             }
         }
-        
         return !empty($channels) ? $channels : false;
-    } catch (Exception $e) {
-        return false;
-    }
-}
-
-/**
- * Gjeneron MAC address
- */
-function generateMacAddress() {
-    if (isset($_SESSION['user_mac'])) {
-        return $_SESSION['user_mac'];
     }
     
-    $mac = "00:1A:79:" . sprintf('%02X', mt_rand(0, 255)) . ':' . 
-                          sprintf('%02X', mt_rand(0, 255)) . ':' . 
-                          sprintf('%02X', mt_rand(0, 255));
-    
-    $_SESSION['user_mac'] = $mac;
-    return $mac;
+    return false;
 }
 
 /**
- * Kthen kanale demo nëse provider-i nuk është i disponueshëm
+ * Funksion për debug - shfaq të gjitha të dhënat nga API
  */
-function getDemoChannels() {
-    return [
-        [
-            'id' => 1,
-            'name' => 'News TV',
-            'stream_id' => '1001',
-            'category' => 'News',
-            'logo' => 'https://via.placeholder.com/100x50/007BFF/white?text=News+TV'
-        ],
-        [
-            'id' => 2,
-            'name' => 'Sports HD', 
-            'stream_id' => '1002',
-            'category' => 'Sports',
-            'logo' => 'https://via.placeholder.com/100x50/28A745/white?text=Sports+HD'
-        ],
-        [
-            'id' => 3,
-            'name' => 'Movie Channel',
-            'stream_id' => '1003', 
-            'category' => 'Movies',
-            'logo' => 'https://via.placeholder.com/100x50/DC3545/white?text=Movies'
-        ],
-        [
-            'id' => 4,
-            'name' => 'Music TV',
-            'stream_id' => '1004',
-            'category' => 'Music',
-            'logo' => 'https://via.placeholder.com/100x50/6F42C1/white?text=Music+TV'
-        ]
-    ];
-}
-
-/**
- * Gjeneron URL për streaming live
- */
-function createStalkerStreamUrl($portal_url, $stream_id, $extension = 'ts') {
-    $mac = isset($_SESSION['user_mac']) ? $_SESSION['user_mac'] : generateMacAddress();
-    
-    $params = [
-        'mac' => $mac,
-        'stream' => $stream_id,
-        'extension' => $extension
+function debugApiResponse($portal_url, $mac_address) {
+    $endpoints = [
+        '/api/channels.php',
+        '/api/get_channels.php',
+        '/api/live.php',
+        '/portal.php?type=itv'
     ];
     
-    return rtrim($portal_url, '/') . '/play/live.php?' . http_build_query($params);
-}
-
-/**
- * Shfaq listen e kanaleve si HTML
- */
-function displayChannelsList($channels, $portal_url = null) {
-    if (empty($channels)) {
-        return '<div class="alert alert-warning">Nuk u gjetën kanale.</div>';
-    }
+    echo "<div style='background: #f8f9fa; padding: 20px; margin: 20px 0;'>";
+    echo "<h3>Debug API Responses:</h3>";
     
-    $html = '<div class="channels-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin: 20px 0;">';
-    
-    foreach ($channels as $channel) {
-        $stream_url = createStalkerStreamUrl(
-            $portal_url ?: getDefaultPortalUrl(),
-            $channel['stream_id'] ?? $channel['id']
-        );
+    foreach ($endpoints as $endpoint) {
+        $api_url = rtrim($portal_url, '/') . $endpoint . '?mac=' . $mac_address;
         
-        $html .= '
-        <div class="channel-card" style="border: 1px solid #ddd; padding: 15px; border-radius: 8px;">
-            <div class="channel-logo" style="text-align: center; margin-bottom: 10px;">
-                <img src="' . ($channel['logo'] ?? 'https://via.placeholder.com/100x50') . '" 
-                     alt="' . htmlspecialchars($channel['name']) . '"
-                     style="max-width: 100px; height: auto;">
-            </div>
-            <div class="channel-info" style="text-align: center;">
-                <h4 style="margin: 10px 0;">' . htmlspecialchars($channel['name']) . '</h4>
-                <p class="category" style="color: #666; margin: 5px 0;">' . ($channel['category'] ?? 'General') . '</p>
-                <a href="watch.php?stream=' . ($channel['stream_id'] ?? $channel['id']) . '" 
-                   class="watch-btn" 
-                   style="display: inline-block; padding: 8px 16px; background: #007BFF; color: white; text-decoration: none; border-radius: 4px;">
-                   Shiko Live
-                </a>
-            </div>
-        </div>';
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $api_url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_SSL_VERIFYPEER => false
+        ]);
+        
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        echo "<div style='margin-bottom: 15px;'>";
+        echo "<strong>Endpoint:</strong> " . $endpoint . "<br>";
+        echo "<strong>HTTP Code:</strong> " . $http_code . "<br>";
+        echo "<strong>Response:</strong> <pre>" . htmlspecialchars($response) . "</pre>";
+        echo "</div>";
+    }
+    
+    echo "</div>";
+}
+
+/**
+ * Shfaq informacion për kanalet e marra
+ */
+function displayChannelsInfo($channels) {
+    $html = '<div style="background: #e9ecef; padding: 10px; margin: 10px 0; border-radius: 4px;">';
+    $html .= '<strong>Kanale të gjetura:</strong> ' . count($channels);
+    
+    if (isset($_SESSION['using_demo_channels'])) {
+        $html .= ' <span style="color: #dc3545;">(Duke përdorur kanale demo)</span>';
+        unset($_SESSION['using_demo_channels']);
     }
     
     $html .= '</div>';
     return $html;
-}
-
-/**
- * Shfaq player HTML
- */
-function displayStalkerPlayer($stream_url, $width = "100%", $height = "400px") {
-    $html = '
-    <div class="stalker-player">
-        <video controls style="width: ' . $width . '; height: ' . $height . '; background: #000;">
-            <source src="' . htmlspecialchars($stream_url) . '" type="video/mp2t">
-            Shfletuesi juaj nuk mbështet video player-in.
-        </video>
-        <div class="player-info" style="margin-top: 10px; padding: 10px; background: #f8f9fa;">
-            <small>Stream URL: ' . htmlspecialchars($stream_url) . '</small>
-        </div>
-    </div>';
-    
-    return $html;
-}
-
-/**
- * Kthen URL default të portalit
- */
-function getDefaultPortalUrl() {
-    if (isset($_SESSION['portal_url'])) {
-        return $_SESSION['portal_url'];
-    }
-    
-    return 'https://stb-webapp.onrender.com';
-}
-
-/**
- * Kontrollon nëse MAC address është valide
- */
-function isValidMacAddress($mac) {
-    return preg_match('/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/', $mac);
 }
 ?>
