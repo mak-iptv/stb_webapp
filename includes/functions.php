@@ -3,16 +3,15 @@
  * Merr kanalet nga Stalker provideri
  */
 function getChannelsFromProvider($force_refresh = false) {
-    // Në Render, përdor memory cache në vend të file cache
+    // Memory cache për 5 minuta
     static $channels_cache = null;
     static $cache_time = 0;
     
-    // Memory cache për 5 minuta
     if (!$force_refresh && $channels_cache !== null && (time() - $cache_time) < 300) {
         return $channels_cache;
     }
     
-    // Provo të marrësh kanale nga Stalker API
+    // Merr kanale nga Stalker API
     $channels = getChannelsFromStalkerAPI();
     
     if (!empty($channels)) {
@@ -21,21 +20,17 @@ function getChannelsFromProvider($force_refresh = false) {
         return $channels;
     }
     
-    // Fallback në kanale demo nëse API dështon
-    return getDemoChannels();
+    // Nëse API dështon, kthe array bosh
+    return [];
 }
 
 /**
  * Merr kanalet nga Stalker Middleware API
  */
 function getChannelsFromStalkerAPI() {
-    $start_time = microtime(true);
-    
     try {
-        // URL e API-s së Stalker
         $api_url = STALKER_PORTAL_URL . '/server/load.php';
         
-        // Të dhënat e kërkesës për Stalker
         $post_data = [
             'type' => 'stb',
             'action' => 'get_all_channels',
@@ -43,7 +38,6 @@ function getChannelsFromStalkerAPI() {
             'JsHttpRequest' => '1-xml'
         ];
         
-        // Konfigurimi i cURL
         $ch = curl_init();
         curl_setopt_array($ch, [
             CURLOPT_URL => $api_url,
@@ -51,41 +45,26 @@ function getChannelsFromStalkerAPI() {
             CURLOPT_POSTFIELDS => http_build_query($post_data),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 15,
-            CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
-            CURLOPT_USERAGENT => 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3',
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/x-www-form-urlencoded',
-                'Referer: ' . STALKER_PORTAL_URL . '/c/',
-                'X-User-Agent: stalker-portal-client'
-            ]
+            CURLOPT_USERAGENT => 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3'
         ]);
         
-        // Ekzekuto kërkesën
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curl_error = curl_error($ch);
         curl_close($ch);
         
-        // Kontrollo përgjigjen HTTP
         if ($http_code !== 200 || empty($response)) {
-            error_log("❌ Stalker API HTTP Error: {$http_code} - {$curl_error}");
             return [];
         }
         
-        // Provo të parse JSON response
         $data = json_decode($response, true);
         
         if (json_last_error() !== JSON_ERROR_NONE || !isset($data['js']['data'])) {
             return [];
         }
         
-        // Process kanalet
         return processStalkerChannels($data['js']['data']);
         
     } catch (Exception $e) {
-        error_log("❌ Stalker API Exception: " . $e->getMessage());
         return [];
     }
 }
@@ -108,8 +87,7 @@ function processStalkerChannels($raw_channels) {
             'number' => isset($channel['number']) ? (int)$channel['number'] : 0,
             'category' => $channel['cat_name'] ?? $channel['category'] ?? 'General',
             'logo' => getStalkerLogoUrl($channel['logo'] ?? $channel['tv_icon_url'] ?? ''),
-            'cmd' => $channel['cmd'] ?? '',
-            'is_radio' => isset($channel['is_radio']) ? (bool)$channel['is_radio'] : false
+            'cmd' => $channel['cmd'] ?? ''
         ];
     }
     
@@ -144,7 +122,6 @@ function getStalkerLogoUrl($logo_path) {
 function getStreamUrl($channel_data) {
     $stream_id = $channel_data['stream_id'];
     
-    // Format Stalker i saktë
     $stream_url = STALKER_PORTAL_URL . '/play/live.php?' . http_build_query([
         'mac' => STALKER_MAC_ADDRESS,
         'stream' => $stream_id,
@@ -174,37 +151,10 @@ function generateSerialNumber() {
 }
 
 /**
- * Kanale demo për fallback
- */
-function getDemoChannels() {
-    return [
-        [
-            'id' => 9356, 'stream_id' => 9356, 'name' => 'RTSH 1', 'number' => 1, 'category' => 'Shqipëri', 'logo' => ''
-        ],
-        [
-            'id' => 9357, 'stream_id' => 9357, 'name' => 'RTSH 2', 'number' => 2, 'category' => 'Shqipëri', 'logo' => ''
-        ],
-        [
-            'id' => 262022, 'stream_id' => 262022, 'name' => 'Top Channel', 'number' => 3, 'category' => 'Shqipëri', 'logo' => ''
-        ],
-        [
-            'id' => 262023, 'stream_id' => 262023, 'name' => 'Klan TV', 'number' => 4, 'category' => 'Shqipëri', 'logo' => ''
-        ],
-        [
-            'id' => 262024, 'stream_id' => 262024, 'name' => 'Vizion Plus', 'number' => 5, 'category' => 'Shqipëri', 'logo' => ''
-        ]
-    ];
-}
-
-/**
- * Verifikimi i kredencialeve të përdoruesit
+ * Verifikimi i kredencialeve të përdoruesit - VETËM PROVIDERI
  */
 function verifyUserCredentials($username, $password) {
-    $valid_users = [
-        'demo' => 'demo',
-        STALKER_USERNAME => STALKER_PASSWORD
-    ];
-    
-    return isset($valid_users[$username]) && $valid_users[$username] === $password;
+    // KRAHASO DIRECT ME KREDENCIALET E PROVIDERIT
+    return $username === STALKER_USERNAME && $password === STALKER_PASSWORD;
 }
 ?>
