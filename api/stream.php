@@ -35,20 +35,17 @@ try {
         throw new Exception('Kanali nuk u gjet');
     }
     
-    // Gjenero stream URL duke përdorur stream_id të vërtetë
+    // Gjenero stream URL në format Stalker
     $stream_url = getStreamUrl($channel_data);
-    
-    // Shto token nëse nevojitet
-    $token = generatePlayToken($channel_data['stream_id'] ?? $channel_data['id']);
-    $stream_url .= (strpos($stream_url, '?') === false ? '?' : '&') . 'token=' . $token;
     
     echo json_encode([
         'success' => true,
         'stream_url' => $stream_url,
         'channel_id' => $channel_id,
-        'stream_id' => $channel_data['stream_id'] ?? $channel_data['id'],
+        'stream_id' => $channel_data['stream_id'],
         'channel_name' => $channel_data['name'],
-        'format' => 'mpegts'
+        'format' => 'mpegts',
+        'player_url' => $stream_url // Për debug
     ]);
     
 } catch (Exception $e) {
@@ -58,9 +55,5 @@ try {
         'success' => false,
         'message' => 'Gabim në marrjen e stream-it: ' . $e->getMessage()
     ]);
-}
-
-function generatePlayToken($stream_id) {
-    return md5(IPTV_USERNAME . IPTV_PASSWORD . $stream_id . date('YmdH'));
 }
 ?>
