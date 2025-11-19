@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: stb_webapp
+    env: php
+    plan: free
+    buildCommand: chmod +x build.sh && ./build.sh
+    startCommand: php -S 0.0.0.0:10000
+    envVars:
+      - key: RENDER
+        value: true
+      - key: PHP_VERSION
+        value: 8.1
