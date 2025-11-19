@@ -3,6 +3,8 @@ require_once '../config.php';
 require_once '../includes/functions.php';
 
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: ' . BASE_URL);
+header('Access-Control-Allow-Methods: GET');
 
 if (!isset($_SESSION['user'])) {
     http_response_code(401);
@@ -32,28 +34,44 @@ try {
     }
     
     if (!$channel_data) {
-        throw new Exception('Kanali nuk u gjet');
+        throw new Exception('Kanali nuk u gjet në listë');
     }
     
     // Gjenero stream URL në format Stalker të saktë
     $stream_url = getStreamUrl($channel_data);
     
-    echo json_encode([
+    // Përgatit përgjigjen
+    $response = [
         'success' => true,
-        'stream_url' => $stream_url,
-        'channel_id' => $channel_id,
-        'stream_id' => $channel_data['stream_id'],
-        'channel_name' => $channel_data['name'],
-        'format' => 'mpegts',
-        'player_type' => 'hls' // m3u8
-    ]);
+        'data' => [
+            'stream_url' => $stream_url,
+            'channel_id' => $channel_id,
+            'stream_id' => $channel_data['stream_id'],
+            'channel_name' => $channel_data['name'],
+            'format' => 'hls',
+            'player_type' => 'hls',
+            'extension' => 'm3u8'
+        ],
+        'stream_info' => [
+            'protocol' => 'hls',
+            'requires_hls_js' => true,
+            'is_live' => true,
+            'url_format' => 'stalker_middleware'
+        ]
+    ];
+    
+    echo json_encode($response, JSON_PRETTY_PRINT);
     
 } catch (Exception $e) {
+    http_response_code(500);
+    
     error_log("Stream API Error: " . $e->getMessage());
     
     echo json_encode([
         'success' => false,
-        'message' => 'Gabim në marrjen e stream-it: ' . $e->getMessage()
+        'message' => 'Gabim në gjenerimin e stream URL',
+        'error' => $e->getMessage(),
+        'error_code' => 'STREAM_GENERATION_ERROR'
     ]);
 }
 ?>
