@@ -1,0 +1,12 @@
+{
+  "name": "stb_webapp",
+  "version": "1.0.0",
+  "description": "IPTV Player",
+  "scripts": {
+    "build": "mkdir -p logs cache images",
+    "start": "php -S 0.0.0.0:$PORT"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}
