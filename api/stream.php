@@ -35,7 +35,7 @@ try {
         throw new Exception('Kanali nuk u gjet');
     }
     
-    // Gjenero stream URL në format Stalker
+    // Gjenero stream URL në format Stalker të saktë
     $stream_url = getStreamUrl($channel_data);
     
     echo json_encode([
@@ -45,7 +45,7 @@ try {
         'stream_id' => $channel_data['stream_id'],
         'channel_name' => $channel_data['name'],
         'format' => 'mpegts',
-        'player_url' => $stream_url // Për debug
+        'player_type' => 'hls' // m3u8
     ]);
     
 } catch (Exception $e) {
