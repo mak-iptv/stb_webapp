@@ -462,6 +462,15 @@ $categories = array_unique(array_column($channels, 'category'));
         .favorite-btn:hover {
             color: #e67e22;
         }
+
+        /* Stream Info */
+        .stream-info {
+            font-size: 12px;
+            color: #ccc;
+            margin-top: 5px;
+            font-family: monospace;
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
@@ -487,7 +496,7 @@ $categories = array_unique(array_column($channels, 'category'));
                 <div class="player-info">
                     <div class="channel-info">
                         <h3 id="currentChannel">Zgjidhni një kanal për të filluar shikimin</h3>
-                        <div id="streamInfo" style="font-size: 12px; color: #ccc; margin-top: 5px;"></div>
+                        <div id="streamInfo" class="stream-info"></div>
                     </div>
                     <div class="player-controls">
                         <button id="playBtn" disabled>▶️ Play</button>
@@ -811,7 +820,7 @@ $categories = array_unique(array_column($channels, 'category'));
             localStorage.setItem('favoriteChannels', JSON.stringify(favorites));
         }
 
-        // Select channel function
+        // Select channel function - UPDATED FOR STALKER FORMAT
         async function selectChannel(channelId, channelName, channelElement) {
             try {
                 // Show loading
@@ -837,22 +846,12 @@ $categories = array_unique(array_column($channels, 'category'));
                 const data = await response.json();
                 
                 if (data.success && data.stream_url) {
-                    // Destroy previous HLS instance
-                    if (hls) {
-                        hls.destroy();
-                        hls = null;
-                    }
-                    
-                    // Set stream info
+                    // Display stream URL info
                     document.getElementById('streamInfo').textContent = 
                         `Stream ID: ${data.stream_id} | Format: ${data.format || 'HLS'}`;
                     
-                    // Load stream based on type
-                    if (data.stream_url.includes('.m3u8') || data.player_type === 'hls') {
-                        loadHlsStream(data.stream_url, channelName);
-                    } else {
-                        loadDirectStream(data.stream_url, channelName);
-                    }
+                    // Load HLS stream (m3u8 format)
+                    loadHlsStream(data.stream_url, channelName);
                     
                     currentChannel = { 
                         id: channelId, 
@@ -863,6 +862,9 @@ $categories = array_unique(array_column($channels, 'category'));
                     
                     // Save to history
                     saveToHistory(currentChannel);
+                    
+                    // Log stream URL for debugging
+                    console.log('Stream URL:', data.stream_url);
                     
                 } else {
                     throw new Error(data.message || 'Stream nuk u gjet');
@@ -877,13 +879,36 @@ $categories = array_unique(array_column($channels, 'category'));
             }
         }
 
-        // Load HLS stream
+        // Load HLS stream - OPTIMIZED FOR STALKER M3U8
         function loadHlsStream(streamUrl, channelName) {
+            // Destroy previous HLS instance
+            if (hls) {
+                hls.destroy();
+                hls = null;
+            }
+
+            // Clear previous source
+            videoPlayer.src = '';
+
             if (Hls.isSupported()) {
+                console.log('🚀 Using HLS.js for stream:', streamUrl);
+                
                 hls = new Hls({
                     enableWorker: true,
                     lowLatencyMode: true,
                     backBufferLength: 90,
+                    maxBufferLength: 30,
+                    maxMaxBufferLength: 60,
+                    maxBufferSize: 60 * 1000 * 1000, // 60MB
+                    maxBufferHole: 0.5,
+                    highBufferWatchdogPeriod: 2,
+                    nudgeOffset: 0.1,
+                    nudgeMaxRetry: 3,
+                    maxFragLookUpTolerance: 0.2,
+                    liveSyncDurationCount: 3,
+                    liveMaxLatencyDurationCount: 10,
+                    liveDurationInfinity: true,
+                    liveBackBufferLength: 90,
                     debug: false
                 });
                 
@@ -891,29 +916,46 @@ $categories = array_unique(array_column($channels, 'category'));
                 hls.attachMedia(videoPlayer);
                 
                 hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                    console.log('HLS manifest parsed');
+                    console.log('✅ HLS manifest parsed successfully');
                     videoPlayer.play().then(() => {
                         document.getElementById('currentChannel').textContent = `▶️ Duke luajtur: ${channelName}`;
                         showSuccess(`Kanali ${channelName} u ngarkua me sukses!`);
                     }).catch(playError => {
                         console.error('Auto-play failed:', playError);
                         document.getElementById('currentChannel').textContent = `📺 ${channelName} - Kliko Play`;
+                        showError('Auto-play dështoi. Ju lutem klikoni butonin Play.');
                     });
                 });
                 
+                hls.on(Hls.Events.LEVEL_LOADED, function(event, data) {
+                    console.log('📊 Level loaded:', data.details);
+                });
+                
+                hls.on(Hls.Events.FRAG_LOADED, function(event, data) {
+                    // console.log('📦 Fragment loaded:', data.frag.url);
+                });
+                
                 hls.on(Hls.Events.ERROR, function(event, data) {
-                    console.error('HLS error:', data);
+                    console.error('❌ HLS error:', data);
+                    
                     if (data.fatal) {
                         switch(data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
-                                showError('Gabim në rrjet. Kontrollo lidhjen me internet.');
+                                console.error('🌐 Network error - trying to recover...');
+                                showError('Gabim në rrjet. Duke u rikthyer...');
+                                hls.startLoad();
                                 break;
                             case Hls.ErrorTypes.MEDIA_ERROR:
-                                showError('Gabim në media. Provoni të rifreskoni faqen.');
+                                console.error('📺 Media error - recovering...');
+                                showError('Gabim në media. Duke u rikthyer...');
                                 hls.recoverMediaError();
                                 break;
                             default:
-                                showError('Gabim i panjohur në HLS.');
+                                console.error('💀 Fatal error - cannot recover');
+                                showError('Gabim fatal. Duke ringarkuar...');
+                                hls.destroy();
+                                // Try direct play as fallback
+                                videoPlayer.src = streamUrl;
                                 break;
                         }
                     }
@@ -921,6 +963,7 @@ $categories = array_unique(array_column($channels, 'category'));
                 
             } else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
                 // Native HLS support (Safari)
+                console.log('🍎 Using native HLS support for Safari');
                 videoPlayer.src = streamUrl;
                 videoPlayer.addEventListener('loadedmetadata', function() {
                     videoPlayer.play().then(() => {
@@ -932,24 +975,8 @@ $categories = array_unique(array_column($channels, 'category'));
                     });
                 });
             } else {
-                showError('HLS nuk është i suportuar në këtë shfletues.');
+                showError('HLS nuk është i suportuar në këtë shfletues. Ju lutem përdorni Chrome, Firefox ose Safari.');
             }
-        }
-
-        // Load direct stream (MPEG-TS)
-        function loadDirectStream(streamUrl, channelName) {
-            videoPlayer.src = streamUrl;
-            videoPlayer.load();
-            
-            videoPlayer.addEventListener('loadeddata', function() {
-                videoPlayer.play().then(() => {
-                    document.getElementById('currentChannel').textContent = `▶️ Duke luajtur: ${channelName}`;
-                    showSuccess(`Kanali ${channelName} u ngarkua me sukses!`);
-                }).catch(playError => {
-                    console.error('Auto-play failed:', playError);
-                    document.getElementById('currentChannel').textContent = `📺 ${channelName} - Kliko Play`;
-                });
-            });
         }
 
         // Save channel to watch history
@@ -964,7 +991,8 @@ $categories = array_unique(array_column($channels, 'category'));
                 id: channel.id,
                 name: channel.name,
                 stream_id: channel.stream_id,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                url: channel.url
             });
             
             // Keep only last 20 items
@@ -1032,7 +1060,7 @@ $categories = array_unique(array_column($channels, 'category'));
                 const data = await response.json();
                 if (data.success) {
                     allChannels = data.channels;
-                    console.log('Channels list updated');
+                    console.log('🔄 Channels list updated');
                 }
             } catch (error) {
                 console.error('Error updating channels:', error);
@@ -1044,6 +1072,15 @@ $categories = array_unique(array_column($channels, 'category'));
             if (hls) {
                 hls.destroy();
             }
+        });
+
+        // Network status monitoring
+        window.addEventListener('online', function() {
+            showSuccess('Lidhja u rikthye!');
+        });
+
+        window.addEventListener('offline', function() {
+            showError('Keni humbur lidhjen me internet!');
         });
     </script>
 </body>
