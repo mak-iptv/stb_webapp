@@ -1,6 +1,10 @@
 <?php
 // Start session
 if (session_status() === PHP_SESSION_NONE) {
+    // Session configuration for Render
+    if (getenv('RENDER')) {
+        ini_set('session.save_path', '/tmp');
+    }
     session_start();
 }
 
@@ -12,14 +16,17 @@ define('STALKER_PASSWORD', 'password_your');
 
 // Application configuration
 define('BASE_URL', 'https://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
-define('CACHE_ENABLED', true);
-define('CACHE_DIR', __DIR__ . '/cache');
 
-// Create necessary directories
-$directories = ['logs', 'cache', 'images'];
-foreach ($directories as $dir) {
-    if (!file_exists($dir)) {
-        mkdir($dir, 0755, true);
-    }
+// Në Render, disable cache directory creation
+define('CACHE_ENABLED', false);
+define('CACHE_DIR', sys_get_temp_dir()); // Përdor temporary directory
+
+// Security headers - VENDOSI PARA ÇDO OUTPUT!
+if (!headers_sent()) {
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: DENY');
+    header('X-XSS-Protection: 1; mode=block');
 }
+
+// Nuk krijojmë direktoritë në Render - do të përdorim temp directory
 ?>
