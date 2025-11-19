@@ -7,13 +7,9 @@ ini_set('display_errors', 1);
 $request_uri = $_SERVER['REQUEST_URI'] ?? '/';
 $path = parse_url($request_uri, PHP_URL_PATH);
 
-// Remove query string
-$path = strtok($path, '?');
-
 // Simple routing
 switch ($path) {
     case '/':
-    case '/index.php':
         showHomePage();
         break;
         
@@ -21,27 +17,19 @@ switch ($path) {
         showLoginPage();
         break;
         
-    case '/logout':
-        handleLogout();
-        break;
-        
     case '/api/channels':
-        handleApiChannels();
-        break;
-        
-    case '/api/stream':
-        handleApiStream();
+        showApiChannels();
         break;
         
     default:
-        // Check for static files (CSS, JS, images)
+        // Check for static files
         if (preg_match('/\.(css|js|png|jpg|jpeg|gif|ico|svg)$/i', $path)) {
             $file_path = ltrim($path, '/');
-            serveStaticFile($file_path);
-            exit;
+            if (file_exists($file_path)) {
+                serveStaticFile($file_path);
+                exit;
+            }
         }
-        
-        // If not found, show 404
         show404($path);
         break;
 }
@@ -54,46 +42,55 @@ function showHomePage() {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Stalker Player - IPTV</title>
-        <link rel="stylesheet" href="/css/style.css">
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                margin: 0;
+                padding: 20px;
+                color: white;
+                min-height: 100vh;
+            }
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+                background: rgba(255,255,255,0.1);
+                padding: 30px;
+                border-radius: 15px;
+                backdrop-filter: blur(10px);
+            }
+            .btn {
+                display: inline-block;
+                background: #3498db;
+                color: white;
+                padding: 12px 25px;
+                margin: 10px;
+                border-radius: 5px;
+                text-decoration: none;
+            }
+            .status {
+                background: rgba(255,255,255,0.2);
+                padding: 20px;
+                border-radius: 10px;
+                margin: 20px 0;
+            }
+        </style>
     </head>
     <body>
         <div class="container">
-            <div class="header">
-                <h1>🎬 Stalker Player - IPTV</h1>
-                <p>✅ Aplikacioni është duke punuar në Apache!</p>
+            <h1>🎬 Stalker Player - IPTV</h1>
+            <p>✅ Aplikacioni është duke punuar!</p>
+            
+            <div class="status">
+                <h3>Server Information:</h3>
+                <p><strong>PHP Version:</strong> <?= PHP_VERSION ?></p>
+                <p><strong>Server:</strong> <?= $_SERVER['SERVER_SOFTWARE'] ?? 'PHP Built-in Server' ?></p>
+                <p><strong>Request:</strong> <?= htmlspecialchars($request_uri ?? '/') ?></p>
             </div>
             
-            <div class="status-box">
-                <h3>📊 Informacione të Serverit:</h3>
-                <ul>
-                    <li><strong>PHP Version:</strong> <?= PHP_VERSION ?></li>
-                    <li><strong>Server Software:</strong> <?= $_SERVER['SERVER_SOFTWARE'] ?? 'N/A' ?></li>
-                    <li><strong>Request URI:</strong> <?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '/') ?></li>
-                    <li><strong>HTTP Host:</strong> <?= $_SERVER['HTTP_HOST'] ?? 'N/A' ?></li>
-                    <li><strong>Port:</strong> <?= $_SERVER['SERVER_PORT'] ?? 'N/A' ?></li>
-                </ul>
-            </div>
-            
-            <div class="navigation">
-                <h3>🧭 Navigim:</h3>
-                <a href="/login" class="btn">🔐 Faqja e Login</a>
-                <a href="/api/channels" class="btn">📡 Testo API</a>
-                <a href="/test" class="btn">❌ Test 404 Page</a>
-            </div>
-            
-            <div class="file-structure">
-                <h3>📁 Struktura e Skedarëve:</h3>
-                <ul>
-                    <?php
-                    $files = scandir('.');
-                    foreach ($files as $file) {
-                        if ($file !== '.' && $file !== '..') {
-                            $type = is_dir($file) ? '📁' : '📄';
-                            echo "<li>{$type} {$file}</li>";
-                        }
-                    }
-                    ?>
-                </ul>
+            <div>
+                <a href="/login" class="btn">🔐 Login Page</a>
+                <a href="/api/channels" class="btn">📡 API Test</a>
             </div>
         </div>
     </body>
@@ -102,137 +99,104 @@ function showHomePage() {
 }
 
 function showLoginPage() {
-    // Handle login form submission
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $username = $_POST['username'] ?? '';
-        $password = $_POST['password'] ?? '';
-        
-        // Simple authentication
-        if ($username === 'demo' && $password === 'demo') {
-            // Start session and redirect
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
-            }
-            $_SESSION['user'] = $username;
-            header('Location: /');
-            exit;
-        } else {
-            $error = "Kredencialet janë të gabuara!";
-        }
-    }
     ?>
     <!DOCTYPE html>
-    <html lang="sq">
+    <html>
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Login - Stalker Player</title>
-        <link rel="stylesheet" href="/css/style.css">
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                margin: 0;
+                padding: 20px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+            }
+            .login-form {
+                background: white;
+                padding: 40px;
+                border-radius: 10px;
+                box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+                width: 100%;
+                max-width: 400px;
+            }
+            .form-group {
+                margin-bottom: 20px;
+            }
+            .form-group input {
+                width: 100%;
+                padding: 12px;
+                border: 2px solid #ddd;
+                border-radius: 5px;
+            }
+            .login-btn {
+                width: 100%;
+                padding: 12px;
+                background: #3498db;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+        </style>
     </head>
     <body>
-        <div class="login-container">
-            <div class="login-form">
-                <h1>🔐 Hyrë në Stalker Player</h1>
-                
-                <?php if (isset($error)): ?>
-                    <div class="error-message">
-                        <?= htmlspecialchars($error) ?>
-                    </div>
-                <?php endif; ?>
-                
-                <form method="POST">
-                    <div class="form-group">
-                        <label for="username">Emri i përdoruesit:</label>
-                        <input type="text" id="username" name="username" value="demo" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="password">Fjalëkalimi:</label>
-                        <input type="password" id="password" name="password" value="demo" required>
-                    </div>
-                    
-                    <button type="submit" class="login-btn">Hyr</button>
-                </form>
-                
-                <div class="demo-info">
-                    <strong>Kredenciale demo:</strong><br>
-                    Përdoruesi: demo<br>
-                    Fjalëkalimi: demo
+        <div class="login-form">
+            <h2>🔐 Login - Stalker Player</h2>
+            <form method="POST">
+                <div class="form-group">
+                    <input type="text" name="username" placeholder="Username" value="demo" required>
                 </div>
-                
-                <div class="back-link">
-                    <a href="/">← Kthehu në Faqen Kryesore</a>
+                <div class="form-group">
+                    <input type="password" name="password" placeholder="Password" value="demo" required>
                 </div>
-            </div>
+                <button type="submit" class="login-btn">Login</button>
+            </form>
+            <p style="text-align: center; margin-top: 20px;">
+                <a href="/">← Back to Home</a>
+            </p>
         </div>
     </body>
     </html>
     <?php
 }
 
-function handleLogout() {
-    // Clear session
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
-    $_SESSION = array();
-    session_destroy();
-    
-    // Redirect to home
-    header('Location: /');
-    exit;
-}
-
-function handleApiChannels() {
+function showApiChannels() {
     header('Content-Type: application/json');
     echo json_encode([
         'success' => true,
-        'message' => 'API is working with Apache!',
+        'message' => 'API is working!',
         'channels' => [
-            ['id' => 1, 'name' => 'RTSH 1', 'category' => 'News'],
-            ['id' => 2, 'name' => 'RTSH 2', 'category' => 'Entertainment'],
-            ['id' => 3, 'name' => 'Top Channel', 'category' => 'General'],
-            ['id' => 4, 'name' => 'Klan TV', 'category' => 'General'],
-            ['id' => 5, 'name' => 'Vizion Plus', 'category' => 'General'],
+            ['id' => 1, 'name' => 'RTSH 1'],
+            ['id' => 2, 'name' => 'RTSH 2'],
+            ['id' => 3, 'name' => 'Top Channel']
         ]
     ]);
-    exit;
-}
-
-function handleApiStream() {
-    header('Content-Type: application/json');
-    echo json_encode([
-        'success' => true,
-        'message' => 'Stream API endpoint',
-        'stream_url' => 'to_be_implemented'
-    ]);
-    exit;
 }
 
 function serveStaticFile($file_path) {
-    if (file_exists($file_path)) {
-        $mime_types = [
-            'css' => 'text/css',
-            'js' => 'application/javascript',
-            'png' => 'image/png',
-            'jpg' => 'image/jpeg',
-            'jpeg' => 'image/jpeg',
-            'gif' => 'image/gif',
-            'ico' => 'image/x-icon',
-            'svg' => 'image/svg+xml'
-        ];
-        
-        $extension = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
-        if (isset($mime_types[$extension])) {
-            header('Content-Type: ' . $mime_types[$extension]);
-        }
-        
-        readfile($file_path);
-    } else {
-        http_response_code(404);
-        echo "Static file not found: " . htmlspecialchars($file_path);
+    $mime_types = [
+        'css' => 'text/css',
+        'js' => 'application/javascript',
+        'png' => 'image/png',
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'gif' => 'image/gif',
+        'ico' => 'image/x-icon',
+        'svg' => 'image/svg+xml'
+    ];
+    
+    $extension = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
+    if (isset($mime_types[$extension])) {
+        header('Content-Type: ' . $mime_types[$extension]);
     }
-    exit;
+    
+    readfile($file_path);
 }
 
 function show404($path) {
@@ -241,23 +205,24 @@ function show404($path) {
     <!DOCTYPE html>
     <html>
     <head>
-        <title>404 - Faqja nuk u gjet</title>
-        <link rel="stylesheet" href="/css/style.css">
+        <meta charset="UTF-8">
+        <title>404 - Not Found</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                margin: 0;
+                padding: 20px;
+                color: white;
+                text-align: center;
+            }
+        </style>
     </head>
     <body>
-        <div class="container">
-            <div class="error-page">
-                <h1>❌ 404 - Faqja nuk u gjet</h1>
-                <p>Faqja <strong><?= htmlspecialchars($path) ?></strong> nuk ekziston.</p>
-                <div class="navigation">
-                    <a href="/" class="btn">🏠 Faqja Kryesore</a>
-                    <a href="/login" class="btn">🔐 Login</a>
-                </div>
-            </div>
-        </div>
+        <h1>❌ 404 - Page Not Found</h1>
+        <p>The page <?= htmlspecialchars($path) ?> was not found.</p>
+        <a href="/" style="color: white;">← Back to Home</a>
     </body>
     </html>
     <?php
-    exit;
 }
-?>
