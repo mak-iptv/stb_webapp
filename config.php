@@ -5,7 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // STALKER MIDDLEWARE CONFIG - NDRROJI KËTO!
-define('STALKER_PORTAL_URL', 'http://testdi1.proxytx.cloud:80');
+define('STALKER_PORTAL_URL', 'http://testdi1.proxytx.cloud:80'); // NDRROJE URL-në e portalit
 define('STALKER_MAC_ADDRESS', '00:1A:79:29:86:BB');
 define('STALKER_USERNAME', 'username_your');
 define('STALKER_PASSWORD', 'password_your');
