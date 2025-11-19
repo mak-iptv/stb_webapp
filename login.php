@@ -1,20 +1,46 @@
 <?php
 require_once 'config.php';
-require_once 'includes/functions.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $portal_url = $_POST['portal_url'] ?? '';
+    $portal_port = $_POST['portal_port'] ?? '';
+    $mac_address = $_POST['mac_address'] ?? '';
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
     
-    if (verifyUserCredentials($username, $password)) {
+    // Validimi i të dhënave
+    if (empty($portal_url) || empty($mac_address) || empty($username) || empty($password)) {
+        $error = "Ju lutem plotësoni të gjitha fushat e detyrueshme!";
+    } else {
+        // Ruaj të dhënat në session
+        $_SESSION['portal_url'] = $portal_url;
+        $_SESSION['portal_port'] = $portal_port;
+        $_SESSION['mac_address'] = $mac_address;
+        $_SESSION['username'] = $username;
+        $_SESSION['password'] = $password;
         $_SESSION['user'] = $username;
         $_SESSION['login_time'] = time();
         
-        header('Location: /dashboard');
-        exit;
-    } else {
-        $error = "Kredencialet janë të gabuara! Kontrolloni username dhe password.";
+        // Testo lidhjen me providerin
+        if (testProviderConnection()) {
+            header('Location: /dashboard');
+            exit;
+        } else {
+            $error = "Lidhja me providerin dështoi. Kontrolloni të dhënat!";
+            // Fshi të dhënat e session nëse lidhja dështon
+            unset($_SESSION['portal_url'], $_SESSION['portal_port'], $_SESSION['mac_address'], 
+                  $_SESSION['username'], $_SESSION['password'], $_SESSION['user']);
+        }
     }
+}
+
+/**
+ * Testo lidhjen me providerin
+ */
+function testProviderConnection() {
+    require_once 'includes/functions.php';
+    $channels = getChannelsFromProvider(true); // force refresh
+    return !empty($channels);
 }
 ?>
 
@@ -47,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             border-radius: 15px;
             box-shadow: 0 15px 35px rgba(0,0,0,0.1);
             width: 100%;
-            max-width: 400px;
+            max-width: 500px;
         }
         
         .login-title {
@@ -86,6 +112,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             outline: none;
         }
         
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .form-row .form-group {
+            flex: 1;
+        }
+        
         .login-btn {
             width: 100%;
             padding: 12px;
@@ -96,6 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-size: 16px;
             cursor: pointer;
             transition: background 0.3s;
+            margin-top: 10px;
         }
         
         .login-btn:hover {
@@ -111,14 +147,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-align: center;
         }
         
-        .provider-info {
+        .info-message {
             background: #d1ecf1;
             color: #0c5460;
             padding: 12px;
             border-radius: 8px;
-            margin-top: 20px;
+            margin-bottom: 20px;
             text-align: center;
             font-size: 14px;
+        }
+        
+        .required {
+            color: #e74c3c;
         }
     </style>
 </head>
@@ -126,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="login-container">
         <div class="login-title">
             <h1>🔐 Stalker Player</h1>
-            <p>Hyrë në sistemin tuaj IPTV</p>
+            <p>Konfiguro lidhjen me providerin tuaj</p>
         </div>
         
         <?php if (isset($error)): ?>
@@ -135,22 +175,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         <?php endif; ?>
         
+        <div class="info-message">
+            <strong>💡 Informacion:</strong> Shkruani të dhënat e providerit tuaj IPTV
+        </div>
+        
         <form method="POST">
-            <div class="form-group">
-                <label for="username">Emri i përdoruesit:</label>
-                <input type="text" id="username" name="username" placeholder="Shkruani username-in tuaj" required>
+            <!-- Provider Settings -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="portal_url">URL e Portalit <span class="required">*</span></label>
+                    <input type="text" id="portal_url" name="portal_url" 
+                           placeholder="http://portal-provider.com" 
+                           value="<?= htmlspecialchars($_POST['portal_url'] ?? '') ?>" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="portal_port">Porti</label>
+                    <input type="number" id="portal_port" name="portal_port" 
+                           placeholder="80 (default)" 
+                           value="<?= htmlspecialchars($_POST['portal_port'] ?? '') ?>">
+                </div>
             </div>
             
             <div class="form-group">
-                <label for="password">Fjalëkalimi:</label>
-                <input type="password" id="password" name="password" placeholder="Shkruani fjalëkalimin" required>
+                <label for="mac_address">MAC Address <span class="required">*</span></label>
+                <input type="text" id="mac_address" name="mac_address" 
+                       placeholder="00:1A:79:XX:XX:XX" 
+                       value="<?= htmlspecialchars($_POST['mac_address'] ?? '') ?>" required>
             </div>
             
-            <button type="submit" class="login-btn">Hyr në Sistem</button>
+            <!-- User Credentials -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="username">Username <span class="required">*</span></label>
+                    <input type="text" id="username" name="username" 
+                           placeholder="Emri i përdoruesit" 
+                           value="<?= htmlspecialchars($_POST['username'] ?? '') ?>" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password <span class="required">*</span></label>
+                    <input type="password" id="password" name="password" 
+                           placeholder="Fjalëkalimi" required>
+                </div>
+            </div>
+            
+            <button type="submit" class="login-btn">🔗 Lidhu me Providerin</button>
         </form>
         
-        <div class="provider-info">
-            <strong>🔧 Kredencialet e providerit tuaj</strong>
+        <div style="margin-top: 20px; text-align: center; color: #666; font-size: 12px;">
+            <p><strong>Format i pritshëm:</strong></p>
+            <p>URL: http://portal.iptvprovider.com</p>
+            <p>MAC: 00:1A:79:XX:XX:XX</p>
         </div>
     </div>
 </body>
