@@ -3,6 +3,11 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+// Start session
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 // Get the current request
 $request_uri = $_SERVER['REQUEST_URI'] ?? '/';
 $path = parse_url($request_uri, PHP_URL_PATH);
@@ -17,8 +22,20 @@ switch ($path) {
         showLoginPage();
         break;
         
+    case '/dashboard':
+        showDashboard();
+        break;
+        
     case '/api/channels':
-        showApiChannels();
+        handleApiChannels();
+        break;
+        
+    case '/api/stream':
+        handleApiStream();
+        break;
+        
+    case '/logout':
+        handleLogout();
         break;
         
     default:
@@ -42,55 +59,31 @@ function showHomePage() {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Stalker Player - IPTV</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                margin: 0;
-                padding: 20px;
-                color: white;
-                min-height: 100vh;
-            }
-            .container {
-                max-width: 800px;
-                margin: 0 auto;
-                background: rgba(255,255,255,0.1);
-                padding: 30px;
-                border-radius: 15px;
-                backdrop-filter: blur(10px);
-            }
-            .btn {
-                display: inline-block;
-                background: #3498db;
-                color: white;
-                padding: 12px 25px;
-                margin: 10px;
-                border-radius: 5px;
-                text-decoration: none;
-            }
-            .status {
-                background: rgba(255,255,255,0.2);
-                padding: 20px;
-                border-radius: 10px;
-                margin: 20px 0;
-            }
-        </style>
+        <link rel="stylesheet" href="/css/style.css">
     </head>
     <body>
         <div class="container">
-            <h1>🎬 Stalker Player - IPTV</h1>
-            <p>✅ Aplikacioni është duke punuar!</p>
-            
-            <div class="status">
-                <h3>Server Information:</h3>
-                <p><strong>PHP Version:</strong> <?= PHP_VERSION ?></p>
-                <p><strong>Server:</strong> <?= $_SERVER['SERVER_SOFTWARE'] ?? 'PHP Built-in Server' ?></p>
-                <p><strong>Request:</strong> <?= htmlspecialchars($request_uri ?? '/') ?></p>
+            <div class="header">
+                <h1>🎬 Stalker Player - IPTV</h1>
+                <p>✅ Aplikacioni është duke punuar në Apache!</p>
             </div>
             
-            <div>
-                <a href="/login" class="btn">🔐 Login Page</a>
-                <a href="/api/channels" class="btn">📡 API Test</a>
+            <div class="status-box">
+                <h3>📊 Informacione të Serverit:</h3>
+                <ul>
+                    <li><strong>PHP Version:</strong> <?= PHP_VERSION ?></li>
+                    <li><strong>Server Software:</strong> <?= $_SERVER['SERVER_SOFTWARE'] ?? 'N/A' ?></li>
+                    <li><strong>Request URI:</strong> <?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '/') ?></li>
+                    <li><strong>HTTP Host:</strong> <?= $_SERVER['HTTP_HOST'] ?? 'N/A' ?></li>
+                    <li><strong>Port:</strong> <?= $_SERVER['SERVER_PORT'] ?? 'N/A' ?></li>
+                </ul>
+            </div>
+            
+            <div class="navigation">
+                <h3>🧭 Navigim:</h3>
+                <a href="/login" class="btn">🔐 Faqja e Login</a>
+                <a href="/api/channels" class="btn">📡 Testo API</a>
+                <a href="/dashboard" class="btn">📺 Dashboard</a>
             </div>
         </div>
     </body>
@@ -99,84 +92,236 @@ function showHomePage() {
 }
 
 function showLoginPage() {
+    // Handle login form submission
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $username = $_POST['username'] ?? '';
+        $password = $_POST['password'] ?? '';
+        
+        // Simple authentication
+        if ($username === 'demo' && $password === 'demo') {
+            $_SESSION['user'] = $username;
+            $_SESSION['login_time'] = time();
+            header('Location: /dashboard');
+            exit;
+        } else {
+            $error = "Kredencialet janë të gabuara!";
+        }
+    }
     ?>
     <!DOCTYPE html>
-    <html>
+    <html lang="sq">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Login - Stalker Player</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                margin: 0;
-                padding: 20px;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
-            }
-            .login-form {
-                background: white;
-                padding: 40px;
-                border-radius: 10px;
-                box-shadow: 0 15px 35px rgba(0,0,0,0.1);
-                width: 100%;
-                max-width: 400px;
-            }
-            .form-group {
-                margin-bottom: 20px;
-            }
-            .form-group input {
-                width: 100%;
-                padding: 12px;
-                border: 2px solid #ddd;
-                border-radius: 5px;
-            }
-            .login-btn {
-                width: 100%;
-                padding: 12px;
-                background: #3498db;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                cursor: pointer;
-            }
-        </style>
+        <link rel="stylesheet" href="/css/style.css">
     </head>
     <body>
-        <div class="login-form">
-            <h2>🔐 Login - Stalker Player</h2>
-            <form method="POST">
-                <div class="form-group">
-                    <input type="text" name="username" placeholder="Username" value="demo" required>
+        <div class="login-container">
+            <div class="login-form">
+                <h1>🔐 Hyrë në Stalker Player</h1>
+                
+                <?php if (isset($error)): ?>
+                    <div class="error-message">
+                        <?= htmlspecialchars($error) ?>
+                    </div>
+                <?php endif; ?>
+                
+                <form method="POST">
+                    <div class="form-group">
+                        <label for="username">Emri i përdoruesit:</label>
+                        <input type="text" id="username" name="username" value="demo" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Fjalëkalimi:</label>
+                        <input type="password" id="password" name="password" value="demo" required>
+                    </div>
+                    
+                    <button type="submit" class="login-btn">Hyr</button>
+                </form>
+                
+                <div class="demo-info">
+                    <strong>Kredenciale demo:</strong><br>
+                    Përdoruesi: demo<br>
+                    Fjalëkalimi: demo
                 </div>
-                <div class="form-group">
-                    <input type="password" name="password" placeholder="Password" value="demo" required>
+                
+                <div class="back-link">
+                    <a href="/">← Kthehu në Faqen Kryesore</a>
                 </div>
-                <button type="submit" class="login-btn">Login</button>
-            </form>
-            <p style="text-align: center; margin-top: 20px;">
-                <a href="/">← Back to Home</a>
-            </p>
+            </div>
         </div>
     </body>
     </html>
     <?php
 }
 
-function showApiChannels() {
+function showDashboard() {
+    // Check if user is logged in
+    if (!isset($_SESSION['user'])) {
+        header('Location: /login');
+        exit;
+    }
+    ?>
+    <!DOCTYPE html>
+    <html lang="sq">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Dashboard - Stalker Player</title>
+        <link rel="stylesheet" href="/css/style.css">
+        <style>
+            .player-container {
+                background: #000;
+                border-radius: 10px;
+                padding: 20px;
+                margin: 20px 0;
+            }
+            #videoPlayer {
+                width: 100%;
+                height: 400px;
+                background: #000;
+            }
+            .channels-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 15px;
+                margin: 20px 0;
+            }
+            .channel-card {
+                background: rgba(255,255,255,0.1);
+                padding: 15px;
+                border-radius: 8px;
+                cursor: pointer;
+                text-align: center;
+            }
+            .channel-card:hover {
+                background: rgba(255,255,255,0.2);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>📺 Stalker Player Dashboard</h1>
+                <p>Përshëndetje, <strong><?= htmlspecialchars($_SESSION['user']) ?></strong>! 
+                   <a href="/logout" style="color: #e74c3c; margin-left: 20px;">🚪 Dil</a>
+                </p>
+            </div>
+
+            <div class="player-container">
+                <video id="videoPlayer" controls>
+                    Shfletuesi juaj nuk suporton video.
+                </video>
+                <div class="player-info">
+                    <h3 id="currentChannel">Zgjidhni një kanal</h3>
+                </div>
+            </div>
+
+            <div class="channels-section">
+                <h3>📡 Kanalet e Disponueshme</h3>
+                <div id="channelsList" class="channels-grid">
+                    <!-- Kanale do të ngarkohen me JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Load channels when page is ready
+            document.addEventListener('DOMContentLoaded', function() {
+                loadChannels();
+            });
+
+            async function loadChannels() {
+                try {
+                    const response = await fetch('/api/channels');
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        displayChannels(data.channels);
+                    }
+                } catch (error) {
+                    console.error('Error loading channels:', error);
+                }
+            }
+
+            function displayChannels(channels) {
+                const channelsList = document.getElementById('channelsList');
+                
+                channelsList.innerHTML = channels.map(channel => `
+                    <div class="channel-card" onclick="selectChannel(${channel.id}, '${channel.name}')">
+                        <div style="font-size: 2em;">📺</div>
+                        <h4>${channel.name}</h4>
+                        <small>${channel.category}</small>
+                    </div>
+                `).join('');
+            }
+
+            function selectChannel(channelId, channelName) {
+                document.getElementById('currentChannel').textContent = `Duke luajtur: ${channelName}`;
+                
+                // Këtu do të shtohet kodi për të loaduar stream-in aktual
+                console.log(`Selected channel: ${channelName} (ID: ${channelId})`);
+                
+                // Highlight selected channel
+                document.querySelectorAll('.channel-card').forEach(card => {
+                    card.style.background = 'rgba(255,255,255,0.1)';
+                });
+                event.currentTarget.style.background = 'rgba(52, 152, 219, 0.3)';
+            }
+        </script>
+    </body>
+    </html>
+    <?php
+}
+
+function handleApiChannels() {
     header('Content-Type: application/json');
+    
+    $channels = [
+        ['id' => 1, 'name' => 'RTSH 1', 'category' => 'Lajme'],
+        ['id' => 2, 'name' => 'RTSH 2', 'category' => 'Argëtim'],
+        ['id' => 3, 'name' => 'Top Channel', 'category' => 'General'],
+        ['id' => 4, 'name' => 'Klan TV', 'category' => 'General'],
+        ['id' => 5, 'name' => 'Vizion Plus', 'category' => 'General'],
+        ['id' => 6, 'name' => 'ABC News', 'category' => 'Lajme'],
+        ['id' => 7, 'name' => 'Film Hits', 'category' => 'Filma'],
+        ['id' => 8, 'name' => 'Music TV', 'category' => 'Muzikë'],
+    ];
+    
     echo json_encode([
         'success' => true,
-        'message' => 'API is working!',
-        'channels' => [
-            ['id' => 1, 'name' => 'RTSH 1'],
-            ['id' => 2, 'name' => 'RTSH 2'],
-            ['id' => 3, 'name' => 'Top Channel']
-        ]
+        'channels' => $channels
     ]);
+    exit;
+}
+
+function handleApiStream() {
+    header('Content-Type: application/json');
+    
+    $channelId = $_GET['channel_id'] ?? null;
+    
+    if ($channelId) {
+        echo json_encode([
+            'success' => true,
+            'stream_url' => 'to_be_implemented',
+            'channel_id' => $channelId
+        ]);
+    } else {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Channel ID required'
+        ]);
+    }
+    exit;
+}
+
+function handleLogout() {
+    $_SESSION = array();
+    session_destroy();
+    header('Location: /');
+    exit;
 }
 
 function serveStaticFile($file_path) {
@@ -205,24 +350,23 @@ function show404($path) {
     <!DOCTYPE html>
     <html>
     <head>
-        <meta charset="UTF-8">
-        <title>404 - Not Found</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                margin: 0;
-                padding: 20px;
-                color: white;
-                text-align: center;
-            }
-        </style>
+        <title>404 - Faqja nuk u gjet</title>
+        <link rel="stylesheet" href="/css/style.css">
     </head>
     <body>
-        <h1>❌ 404 - Page Not Found</h1>
-        <p>The page <?= htmlspecialchars($path) ?> was not found.</p>
-        <a href="/" style="color: white;">← Back to Home</a>
+        <div class="container">
+            <div class="error-page">
+                <h1>❌ 404 - Faqja nuk u gjet</h1>
+                <p>Faqja <strong><?= htmlspecialchars($path) ?></strong> nuk ekziston.</p>
+                <div class="navigation">
+                    <a href="/" class="btn">🏠 Faqja Kryesore</a>
+                    <a href="/login" class="btn">🔐 Login</a>
+                </div>
+            </div>
+        </div>
     </body>
     </html>
     <?php
+    exit;
 }
+?>
