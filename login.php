@@ -70,5 +70,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <button type="submit">Lidhu</button>
         </form>
     </div>
+    // Në fund të formës në login.php, shto:
+<div style="margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 4px;">
+    <small>
+        <strong>Info:</strong> Nëse nuk shfaqen kanalet e provider-it, 
+        <a href="debug.php">klikoni këtu për debug</a>
+    </small>
+</div>
 </body>
 </html>
