@@ -19,10 +19,11 @@ if (!isset($_GET['channel_id'])) {
 $channel_id = intval($_GET['channel_id']);
 
 try {
-    // Merr të gjitha kanalet për të gjetur stream URL
+    // Merr të gjitha kanalet
     $channels = getChannelsFromProvider();
     $channel_data = null;
     
+    // Gjej channel-in e zgjedhur
     foreach ($channels as $channel) {
         if ($channel['id'] == $channel_id) {
             $channel_data = $channel;
@@ -30,33 +31,36 @@ try {
         }
     }
     
-    if ($channel_data && !empty($channel_data['stream_url'])) {
-        $stream_url = $channel_data['stream_url'];
-        
-        // Nëse provideri kërkon token
-        if (strpos($stream_url, 'token') === false) {
-            $stream_url .= '?token=' . generatePlayToken($channel_id);
-        }
-        
-        echo json_encode([
-            'success' => true,
-            'stream_url' => $stream_url,
-            'channel_id' => $channel_id,
-            'channel_name' => $channel_data['name']
-        ]);
-    } else {
-        echo json_encode([
-            'success' => false,
-            'message' => 'Stream nuk u gjet për këtë kanal'
-        ]);
+    if (!$channel_data) {
+        throw new Exception('Kanali nuk u gjet');
     }
+    
+    // Gjenero stream URL duke përdorur stream_id të vërtetë
+    $stream_url = getStreamUrl($channel_data);
+    
+    // Shto token nëse nevojitet
+    $token = generatePlayToken($channel_data['stream_id'] ?? $channel_data['id']);
+    $stream_url .= (strpos($stream_url, '?') === false ? '?' : '&') . 'token=' . $token;
+    
+    echo json_encode([
+        'success' => true,
+        'stream_url' => $stream_url,
+        'channel_id' => $channel_id,
+        'stream_id' => $channel_data['stream_id'] ?? $channel_data['id'],
+        'channel_name' => $channel_data['name'],
+        'format' => 'mpegts'
+    ]);
     
 } catch (Exception $e) {
     error_log("Stream API Error: " . $e->getMessage());
     
     echo json_encode([
         'success' => false,
-        'message' => 'Gabim në marrjen e stream-it'
+        'message' => 'Gabim në marrjen e stream-it: ' . $e->getMessage()
     ]);
+}
+
+function generatePlayToken($stream_id) {
+    return md5(IPTV_USERNAME . IPTV_PASSWORD . $stream_id . date('YmdH'));
 }
 ?>
