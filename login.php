@@ -1,5 +1,5 @@
 <?php
-session_start();
+// MOS E START SESSION KËTU - është startuar tashmë nga index.php
 
 // Nëse useri është tashmë i loguar, shko në dashboard
 if (isset($_SESSION['user'])) {
