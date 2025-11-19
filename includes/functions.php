@@ -1,8 +1,53 @@
 <?php
 /**
+ * Merr konfigurimin nga session
+ */
+function getStalkerConfig() {
+    if (!isset($_SESSION['portal_url']) || !isset($_SESSION['mac_address']) || 
+        !isset($_SESSION['username']) || !isset($_SESSION['password'])) {
+        return null;
+    }
+    
+    return [
+        'portal_url' => $_SESSION['portal_url'],
+        'portal_port' => $_SESSION['portal_port'] ?? '80',
+        'mac_address' => $_SESSION['mac_address'],
+        'username' => $_SESSION['username'],
+        'password' => $_SESSION['password']
+    ];
+}
+
+/**
+ * Merr URL të plotë të portalit
+ */
+function getPortalUrl() {
+    $config = getStalkerConfig();
+    if (!$config) return null;
+    
+    $url = $config['portal_url'];
+    $port = $config['portal_port'];
+    
+    // Shto port nëse është specifikuar dhe nuk është 80
+    if (!empty($port) && $port !== '80') {
+        // Kontrollo nëse URL ka tashmë port
+        if (parse_url($url, PHP_URL_PORT) === null) {
+            $url .= ':' . $port;
+        }
+    }
+    
+    return $url;
+}
+
+/**
  * Merr kanalet nga Stalker provideri
  */
 function getChannelsFromProvider($force_refresh = false) {
+    // Kontrollo nëse kemi konfigurim
+    $config = getStalkerConfig();
+    if (!$config) {
+        return [];
+    }
+    
     // Memory cache për 5 minuta
     static $channels_cache = null;
     static $cache_time = 0;
@@ -20,7 +65,6 @@ function getChannelsFromProvider($force_refresh = false) {
         return $channels;
     }
     
-    // Nëse API dështon, kthe array bosh
     return [];
 }
 
@@ -28,13 +72,19 @@ function getChannelsFromProvider($force_refresh = false) {
  * Merr kanalet nga Stalker Middleware API
  */
 function getChannelsFromStalkerAPI() {
+    $config = getStalkerConfig();
+    if (!$config) return [];
+    
+    $portal_url = getPortalUrl();
+    if (!$portal_url) return [];
+    
     try {
-        $api_url = STALKER_PORTAL_URL . '/server/load.php';
+        $api_url = $portal_url . '/server/load.php';
         
         $post_data = [
             'type' => 'stb',
             'action' => 'get_all_channels',
-            'mac' => STALKER_MAC_ADDRESS,
+            'mac' => $config['mac_address'],
             'JsHttpRequest' => '1-xml'
         ];
         
@@ -53,6 +103,7 @@ function getChannelsFromStalkerAPI() {
         curl_close($ch);
         
         if ($http_code !== 200 || empty($response)) {
+            error_log("API Error: HTTP $http_code");
             return [];
         }
         
@@ -65,6 +116,7 @@ function getChannelsFromStalkerAPI() {
         return processStalkerChannels($data['js']['data']);
         
     } catch (Exception $e) {
+        error_log("Stalker API Exception: " . $e->getMessage());
         return [];
     }
 }
@@ -73,6 +125,7 @@ function getChannelsFromStalkerAPI() {
  * Process kanalet nga Stalker API
  */
 function processStalkerChannels($raw_channels) {
+    $portal_url = getPortalUrl();
     $channels = [];
     
     foreach ($raw_channels as $channel) {
@@ -105,29 +158,39 @@ function processStalkerChannels($raw_channels) {
 function getStalkerLogoUrl($logo_path) {
     if (empty($logo_path)) return '';
     
+    $portal_url = getPortalUrl();
+    if (!$portal_url) return '';
+    
     if (strpos($logo_path, 'http') === 0) {
         return $logo_path;
     }
     
     if (strpos($logo_path, '/') === 0) {
-        return STALKER_PORTAL_URL . $logo_path;
+        return $portal_url . $logo_path;
     }
     
-    return STALKER_PORTAL_URL . '/misc/logos/320/' . $logo_path;
+    return $portal_url . '/misc/logos/320/' . $logo_path;
 }
 
 /**
  * Gjenero stream URL për Stalker format
  */
 function getStreamUrl($channel_data) {
+    $config = getStalkerConfig();
+    $portal_url = getPortalUrl();
+    
+    if (!$config || !$portal_url) {
+        return '';
+    }
+    
     $stream_id = $channel_data['stream_id'];
     
-    $stream_url = STALKER_PORTAL_URL . '/play/live.php?' . http_build_query([
-        'mac' => STALKER_MAC_ADDRESS,
+    $stream_url = $portal_url . '/play/live.php?' . http_build_query([
+        'mac' => $config['mac_address'],
         'stream' => $stream_id,
         'extension' => 'm3u8',
-        'play_token' => generateStalkerToken($stream_id),
-        'sn2' => generateSerialNumber(),
+        'play_token' => generateStalkerToken($stream_id, $config),
+        'sn2' => generateSerialNumber($config['mac_address']),
         'type' => 'm3u8'
     ]);
     
@@ -137,24 +200,16 @@ function getStreamUrl($channel_data) {
 /**
  * Gjenero token për Stalker
  */
-function generateStalkerToken($stream_id) {
+function generateStalkerToken($stream_id, $config) {
     $timestamp = time();
-    $token_data = STALKER_USERNAME . STALKER_PASSWORD . $stream_id . $timestamp;
+    $token_data = $config['username'] . $config['password'] . $stream_id . $timestamp;
     return substr(md5($token_data), 0, 10);
 }
 
 /**
  * Gjenero serial number për Stalker
  */
-function generateSerialNumber() {
-    return substr(md5(STALKER_MAC_ADDRESS . time()), 0, 12);
-}
-
-/**
- * Verifikimi i kredencialeve të përdoruesit - VETËM PROVIDERI
- */
-function verifyUserCredentials($username, $password) {
-    // KRAHASO DIRECT ME KREDENCIALET E PROVIDERIT
-    return $username === STALKER_USERNAME && $password === STALKER_PASSWORD;
+function generateSerialNumber($mac_address) {
+    return substr(md5($mac_address . time()), 0, 12);
 }
 ?>
