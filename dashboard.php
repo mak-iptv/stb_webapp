@@ -474,16 +474,18 @@ $categories = array_unique(array_column($channels, 'category'));
     </style>
 </head>
 <body>
-    <!-- Header -->
+     <!-- Header -->
     <div class="dashboard-header">
         <div class="header-left">
             <h1>🎬 Stalker Player</h1>
+            <div style="color: #ccc; font-size: 14px; margin-top: 5px;">
+                Provider: <strong><?= htmlspecialchars($_SESSION['username'] ?? 'N/A') ?></strong> | 
+                MAC: <strong><?= htmlspecialchars($_SESSION['mac_address'] ?? 'N/A') ?></strong>
+            </div>
         </div>
-       <!-- Në pjesën e header-it, zëvendëso: -->
-<div class="user-info">
-    <span class="user-welcome">Përshëndetje, <strong><?= htmlspecialchars($_SESSION['user']) ?></strong></span>
-    <a href="/logout" class="logout-btn">🚪 Dil</a>
-</div>
+        <div class="user-info">
+            <a href="/logout" class="logout-btn">🚪 Dil</a>
+        </div>
     </div>
 
     <!-- Main Container -->
