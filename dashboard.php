@@ -1,5 +1,5 @@
 <?php
-session_start();
+// MOS E START SESSION KËTU - është startuar tashmë nga index.php
 
 // Kontrollo nëse useri është i loguar
 if (!isset($_SESSION['user'])) {
@@ -7,8 +7,8 @@ if (!isset($_SESSION['user'])) {
     exit;
 }
 
-// Merr kanalet nga provideri
-require_once 'includes/functions.php';
+// Merr kanalet nga provideri - përdor include_once
+include_once 'includes/functions.php';
 $channels = getChannelsFromProvider();
 ?>
 
