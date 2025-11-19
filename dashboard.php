@@ -118,7 +118,21 @@ $channels = getChannelsFromProvider();
         .category-btn.active {
             background: #3498db;
         }
-        
+        .channel-number {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+}
+
+.channel-card {
+    position: relative;
+    /* existing styles */
+}
         .channels-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
