@@ -4,7 +4,7 @@ html, body {
     margin: 0;
     font-family: 'Arial', sans-serif;
     color: #333;
-    overflow: hidden; /* Fsheh skroll-in kryesor */
+    overflow: hidden;
 }
 
 /* Stilizimi i Aplikacionit Kryesor (Player-i dhe Sidebar) */
@@ -16,17 +16,17 @@ html, body {
 }
 
 .player-container {
-    flex-grow: 1; /* Merr hapësirën maksimale të mbetur */
+    flex-grow: 1;
     padding: 10px;
     background-color: #1a1a1a;
     display: flex;
-    align-items: center; /* Qendron vertikalisht */
-    justify-content: center; /* Qendron horizontalisht */
+    align-items: center;
+    justify-content: center;
 }
 
 #videoPlayer {
     width: 100%;
-    max-height: 100%; /* Siguron që videoja të zërë hapësirën maksimale pa dalë jashtë */
+    max-height: 100%;
     background-color: black;
 }
 
@@ -37,7 +37,7 @@ html, body {
     background-color: #ffffff;
     padding: 20px 10px;
     box-shadow: -2px 0 8px rgba(0,0,0,0.1);
-    overflow-y: auto; /* Mundëson skrollimin e listës së kanaleve */
+    overflow-y: auto;
     box-sizing: border-box;
 }
 
@@ -61,9 +61,9 @@ h2 {
     border-bottom: 1px solid #eee;
     font-size: 14px;
     transition: background-color 0.2s;
-    white-space: nowrap; /* Parandalon thyerjen e tekstit të emrit */
+    white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis; /* Shton tre pika nqs emri është shumë i gjatë */
+    text-overflow: ellipsis;
 }
 
 #channelList li:hover {
@@ -71,13 +71,12 @@ h2 {
 }
 
 #channelList li.active {
-    background-color: #00bcd4; /* Ngjyra thelbësore e aplikacionit */
+    background-color: #00bcd4;
     color: white;
     font-weight: bold;
 }
 
-/* --- Stilizimi i Hyrjes (Login) --- */
-
+/* Stilizimi i Hyrjes (Login) */
 .login-overlay {
     position: fixed;
     top: 0;
