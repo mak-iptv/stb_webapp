@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let hlsInstance;
 
-    // Këto variabla ruajnë të dhënat e sesionit për ndërtimin e URL-së së kanalit
+    // Variablat e sesionit
     let currentPortalUrl = '';
     let currentMacAddress = '';
 
@@ -32,7 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
             hlsInstance.loadSource(url);
             hlsInstance.attachMedia(videoElement);
             hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() {
-                // Vendoset muted për të shmangur bllokimin e Auto-play
                 videoElement.muted = true; 
                 videoElement.play().catch(e => console.error('Auto-play u bllokua.'));
             });
@@ -59,19 +58,17 @@ document.addEventListener('DOMContentLoaded', () => {
         channels.forEach((channel, index) => {
             const listItem = document.createElement('li');
             listItem.textContent = channel.name;
-            // Ruajmë URL-në relative të kanalit
             listItem.dataset.url = channel.url; 
             
             listItem.addEventListener('click', () => {
                 document.querySelectorAll('#channelList li').forEach(li => li.classList.remove('active'));
                 listItem.classList.add('active');
 
-                // NDËRTOJMË URL-NË E PLOTË TË KANALIT KËTU:
-                // Portali juaj e përdor formatin: play/live.php?mac=...&stream=...&extension=ts&play_token=...
+                // Ndërton URL-në e plotë HLS duke përdorur URL-në relative të kanalit
                 const channelUrl = `${currentPortalUrl.replace(/\/$/, "")}/${channel.url.replace(/^\//, "")}`;
                 
-                // Zëvendësoni &extension=ts me &extension=m3u8 për HLS, nëse portali e mbështet
-                const hlsUrl = channelUrl.replace(/&extension=ts/, '&extension=m3u8');
+                // Kërkon &extension=m3u8 për HLS, duke zëvendësuar formatet e vjetra (p.sh., &extension=ts)
+                const hlsUrl = channelUrl.replace(/&extension=[^&]*/, '&extension=m3u8');
                 
                 playChannel(hlsUrl);
             });
@@ -87,44 +84,52 @@ document.addEventListener('DOMContentLoaded', () => {
     // =========================================================
     
     /**
-     * Tenton të analizojë kodin HTML/JavaScript të Portalit IPTV StB.
+     * Tenton të analizojë kodin HTML/JavaScript të Portalit IPTV StB duke provuar variabla të ndryshme.
      */
     function extractChannels(portalContent) {
+        console.log("Duke analizuar përmbajtjen e portalit...");
+        
+        // 🛑 DEBUG: Shfaq përmbajtjen e plotë për kontroll manual në Konsolë
+        console.log("Përmbajtja e Papërpunuar e Portalit:", portalContent.substring(0, 1000) + '...');
+        
         let channels = [];
         
-        try {
-            // 🛑 KËRKOHET variabla 'var items' (një nga më të zakonshmet)
-            // Kërkon një bllok që fillon me 'var items = ' dhe përfundon para ';'
-            const regex = /var items\s*=\s*(\[[^\]]*?\]\s*)/s;
-            const match = portalContent.match(regex);
+        // Lista e variablave të zakonshme për t'u provuar
+        const possibleVariables = ['items', 'list_items', 'all_channels', 'channel_list', 'list', 'playlist'];
+        
+        for (const varName of possibleVariables) {
+            try {
+                // Shprehja e rregullt për të kapur 'var emri_variablës = [...]'
+                const regex = new RegExp(`var ${varName}\\s*=\\s*(\\[[^\\]]*?\\]\\s*)`, 's');
+                const match = portalContent.match(regex);
 
-            if (match && match[1]) {
-                const jsonString = match[1].trim();
-                
-                // Përdor 'eval' për të ekzekutuar array-in JavaScript të marrë (Kujdes, por i nevojshëm këtu)
-                const allChannelsArray = eval(jsonString); 
-                
-                // Mapon formatin e portalit në formatin tonë: {name: 'Emri', url: 'URL_Relative'}
-                channels = allChannelsArray.map(ch => {
-                    // Kjo është URL-ja RELATIVE e kanalit (p.sh., play/live.php?...)
-                    const relativeUrl = ch.url || ch.cmd || ''; 
-                    return {
-                        name: ch.name || ch.title || 'Kanal i Panjohur', 
-                        url: relativeUrl 
-                    };
-                }).filter(ch => ch.url); // Filtrimi i kanaleve pa URL
-                
-                console.log(`Gjetur ${channels.length} kanale duke përdorur 'var items'.`);
-            } else {
-                console.error("Nuk u gjet variabla 'var items'. Analiza dështoi.");
+                if (match && match[1]) {
+                    const jsonString = match[1].trim();
+                    
+                    // Përdor 'eval' për të ekzekutuar array-in JavaScript të marrë
+                    const allChannelsArray = eval(jsonString); 
+                    
+                    // Mapon formatin e portalit në formatin tonë: {name: 'Emri', url: 'URL_Relative'}
+                    channels = allChannelsArray.map(ch => {
+                        const relativeUrl = ch.url || ch.cmd || ''; 
+                        return {
+                            name: ch.name || ch.title || 'Kanal i Panjohur', 
+                            url: relativeUrl 
+                        };
+                    }).filter(ch => ch.url);
+                    
+                    console.log(`SUKSES: Gjetur ${channels.length} kanale duke përdorur variablën '${varName}'.`);
+                    return channels; // Kthe listën dhe ndalo
+                }
+
+            } catch (e) {
+                console.warn(`Gabim gjatë provës së variablës '${varName}':`, e);
             }
-
-        } catch (e) {
-            console.error("Gabim fatal në analizën e përmbajtjes së kanalit:", e);
         }
         
-        return channels.length > 0 ? channels : [
-             { name: "🔴 ERROR: Nuk u gjetën kanale reale. Provoni një Portal tjetër.", url: "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8" }
+        // Nëse asnjëra nuk funksionon, kthehet gabimi
+        return [
+             { name: "🔴 ERROR: Nuk u gjetën kanale reale. Kontrolloni Konsolën për debug.", url: "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8" }
         ];
     }
     
@@ -133,7 +138,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // =========================================================
     
     async function fetchChannelsFromPortal(serverUrl, macAddress) {
-        // Ruajmë vlerat për përdorim të mëvonshëm
         currentPortalUrl = serverUrl.trim();
         currentMacAddress = macAddress.trim();
         
