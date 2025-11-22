@@ -1,6 +1,83 @@
-/* Stilizimet Ekzistuese (body, .player-container, .sidebar, etj.) shkojnë këtu... */
+/* Stilizimet Bazë Globale */
+html, body {
+    height: 100%;
+    margin: 0;
+    font-family: 'Arial', sans-serif;
+    color: #333;
+    overflow: hidden; /* Fsheh skroll-in kryesor */
+}
 
-/* Shtesa për formularin e Hyrjes */
+/* Stilizimi i Aplikacionit Kryesor (Player-i dhe Sidebar) */
+.app-container {
+    display: flex;
+    width: 100%;
+    height: 100vh;
+    background-color: #f4f4f9;
+}
+
+.player-container {
+    flex-grow: 1; /* Merr hapësirën maksimale të mbetur */
+    padding: 10px;
+    background-color: #1a1a1a;
+    display: flex;
+    align-items: center; /* Qendron vertikalisht */
+    justify-content: center; /* Qendron horizontalisht */
+}
+
+#videoPlayer {
+    width: 100%;
+    max-height: 100%; /* Siguron që videoja të zërë hapësirën maksimale pa dalë jashtë */
+    background-color: black;
+}
+
+/* Stilizimi i Listës së Kanaleve (Sidebar) */
+.sidebar {
+    width: 300px;
+    min-width: 250px;
+    background-color: #ffffff;
+    padding: 20px 10px;
+    box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+    overflow-y: auto; /* Mundëson skrollimin e listës së kanaleve */
+    box-sizing: border-box;
+}
+
+h2 {
+    margin-top: 0;
+    color: #333;
+    border-bottom: 2px solid #00bcd4;
+    padding-bottom: 5px;
+    margin-bottom: 15px;
+}
+
+#channelList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#channelList li {
+    padding: 12px 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    font-size: 14px;
+    transition: background-color 0.2s;
+    white-space: nowrap; /* Parandalon thyerjen e tekstit të emrit */
+    overflow: hidden;
+    text-overflow: ellipsis; /* Shton tre pika nqs emri është shumë i gjatë */
+}
+
+#channelList li:hover {
+    background-color: #e0f7fa;
+}
+
+#channelList li.active {
+    background-color: #00bcd4; /* Ngjyra thelbësore e aplikacionit */
+    color: white;
+    font-weight: bold;
+}
+
+/* --- Stilizimi i Hyrjes (Login) --- */
+
 .login-overlay {
     position: fixed;
     top: 0;
@@ -16,53 +93,68 @@
 
 .login-box {
     background-color: #fff;
-    padding: 30px;
-    border-radius: 8px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-    width: 350px;
+    padding: 30px 40px;
+    border-radius: 10px;
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.5);
+    width: 380px;
     display: flex;
     flex-direction: column;
+}
+
+.login-box h3 {
+    margin-top: 0;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    font-size: 20px;
+    color: #00bcd4;
 }
 
 .login-box label {
     margin-top: 15px;
     margin-bottom: 5px;
     font-weight: bold;
-    color: #333;
+    color: #555;
+    font-size: 14px;
 }
 
 .login-box input {
-    padding: 10px;
+    padding: 12px;
     margin-bottom: 20px;
     border: 1px solid #ccc;
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: 16px;
+    transition: border-color 0.3s;
+}
+
+.login-box input:focus {
+    border-color: #00bcd4;
+    outline: none;
 }
 
 #connectButton {
     background-color: #00bcd4;
     color: white;
-    padding: 12px;
+    padding: 14px;
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
     font-size: 18px;
+    font-weight: bold;
     transition: background-color 0.3s;
 }
 
 #connectButton:hover {
     background-color: #008fa3;
 }
-/* Stilizimi për aplikacionin kryesor (kur është aktiv) */
-.app-container {
-    display: flex;
-    width: 100%;
-    height: 100vh; /* Siguron që aplikacioni të zërë të gjithë ekranin */
+
+#connectButton:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
 }
 
-/* Duhet të siguroheni që body dhe html të mos kenë margin */
-html, body {
-    height: 100%;
-    margin: 0;
-    overflow: hidden; /* Fsheh skroll-in kryesor */
+#loginMessage {
+    margin-top: 15px;
+    font-size: 14px;
+    text-align: center;
 }
