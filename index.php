@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web StB MAC Player</title>
-    <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="loginSection" class="login-overlay">
@@ -34,7 +34,7 @@
             </ul>
         </div>
     </div>
-    <script src="server.js"></script>
+    
     <script src="script.js"></script>
 </body>
 </html>
