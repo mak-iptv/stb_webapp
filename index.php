@@ -34,7 +34,7 @@
             </ul>
         </div>
     </div>
-    
+    <script src="server.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
