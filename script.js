@@ -129,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Nëse asnjëra nuk funksionon, kthehet gabimi
         return [
-             { name: "🔴 ERROR: Nuk u gjetën kanale reale. Kontrolloni Konsolën për debug.", url: "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8" }
+             { name: "🔴 ERROR: Nuk u gjetën kanale reale. Kontrolloni Konsolën për debug.", url: "" }
         ];
     }
     
