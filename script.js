@@ -69,14 +69,58 @@ document.addEventListener('DOMContentLoaded', () => {
     /**
      * Zëvendësojeni këtë funksion për të analizuar data.rawData reale.
      */
+ // =========================================================
+    // 2. FUNKSIONI I ANALIZËS (PARSING) PËR PORTALET STB
+    // =========================================================
+    
+    /**
+     * Tenton të analizojë kodin HTML/JavaScript të Portalit IPTV StB.
+     * Portalet shpesh përdorin JSON të fshehur në një variabël JavaScript.
+     */
     function extractChannels(portalContent) {
         console.log("Duke analizuar përmbajtjen e portalit...");
-        // Kjo listë është vetëm për testim:
-        return [
-             { name: "Kanali Testi HLS 1 (Mux)", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" },
-             { name: "Kanali Testi HLS 2 (Sintel)", url: "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8" }
+        
+        let channels = [];
+        
+        try {
+            // 1. Kërkohet për të dhënat brenda kodeve <script>
+            // Shpesh, kanalet ruhen brenda një array JavaScript-i të tillë: 'var all_channels = [...];'
+            
+            // Përdorim Shprehje të Rregullta (Regex) për të gjetur bllokun e kanalit.
+            // Shprehja kërkon një bllok që fillon me 'var all_channels = ' dhe përfundon para ';'
+            const regex = /var all_channels\s*=\s*(\[[^\]]*?\]\s*)/s;
+            const match = portalContent.match(regex);
+
+            if (match && match[1]) {
+                const jsonString = match[1].trim();
+                
+                // Përmbajtja e marrë shpesh nuk është JSON i pastër
+                // Kujdes: Kjo është e rrezikshme (eval) dhe duhet përdorur me kujdes
+                const allChannelsArray = eval(jsonString); 
+                
+                // Konverton formatin e portalit në formatin e aplikacionit tonë
+                channels = allChannelsArray.map(ch => ({
+                    // Varet nga çelësat që përdor Portali, këto janë shembuj:
+                    name: ch.name || ch.title, 
+                    url: ch.url || ch.cmd 
+                }));
+                
+                console.log(`Gjetur ${channels.length} kanale nga portali.`);
+            } else {
+                console.error("Nuk u gjet variabla 'all_channels' në përmbajtjen e portalit.");
+            }
+
+        } catch (e) {
+            console.error("Gabim në analizën e përmbajtjes së kanalit:", e);
+        }
+        
+        // Nëse analiza dështon, kthehen kanalet testuese si rezervë.
+        return channels.length > 0 ? channels : [
+             { name: "🔴 ERROR: Nuk u gjetën kanale reale.", url: "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8" }
         ];
     }
+    
+    // ... Pjesa tjetër e kodit mbetet e njëjtë ...
     
     async function fetchChannelsFromPortal(serverUrl, macAddress) {
         const currentUrl = serverUrl.trim();
