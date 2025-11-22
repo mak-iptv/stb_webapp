@@ -1,8 +1,8 @@
 // script.js
 const SERVER_URL_KEY = 'stb_server_url';
 const MAC_ADDRESS_KEY = 'stb_mac_address';
-// URL-ja e Proxy Server-it që po ekzekutoni në localhost:3000
-const PROXY_SERVER_URL = 'https://stb-webapp-proxy-server.onrender.com'; 
+// Zëvendësojeni këtë me URL-në PUBLIKE të Proxy Server-it tuaj në Render
+const PROXY_SERVER_URL = 'https://stb-webapp.onrender.com'; 
 
 document.addEventListener('DOMContentLoaded', () => {
     const videoElement = document.getElementById('videoPlayer');
@@ -16,10 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let hlsInstance;
     
-    // =========================================================
-    // Player & Render Functions
-    // =========================================================
-
+    // Funksioni per te luajtur kanalin me HLS.js
     function playChannel(url) {
         if (hlsInstance) hlsInstance.destroy();
         
@@ -34,19 +31,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 videoElement.play().catch(e => console.log('Auto-play u bllokua.'));
             });
             hlsInstance.on(Hls.Events.ERROR, function (event, data) {
-                if (data.fatal) {
-                    loginMessage.textContent = `Gabim fatal. Provoni një kanal tjetër.`;
+                 if (data.fatal) {
+                    loginMessage.textContent = `Gabim fatal: ${data.details}. Provoni nje kanal tjeter.`;
                     hlsInstance.destroy();
                 }
             });
         } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
             videoElement.src = url;
-            videoElement.addEventListener('loadedmetadata', function() {
-                videoElement.play();
-            });
+            videoElement.play();
         }
     }
     
+    // Funksioni per te shfaqur listen e kanaleve
     function renderChannelList(channels) {
         channelListElement.innerHTML = '';
         if (channels.length === 0) {
@@ -73,13 +69,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // =========================================================
-    // API & Login Logic
-    // =========================================================
-    
-    // Funksioni nuk analizon HTML/JS, por vetëm tregon se ku do të vendosen kanalet
+    // Funksioni per te kontaktuar Proxy Server-in
     async function fetchChannelsFromPortal(serverUrl, macAddress) {
-        loginMessage.textContent = 'Duke u lidhur me serverin proxy...';
+        loginMessage.textContent = 'Duke u lidhur me Proxy Server...';
         connectButton.disabled = true;
 
         const proxyApiUrl = `${PROXY_SERVER_URL}/api/stb-login?portalUrl=${encodeURIComponent(serverUrl)}&macAddress=${macAddress}`;
@@ -90,15 +82,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (response.ok && data.success) {
                 
-                // ⚠️ KËTU ËSHTË VENDI KRYESOR PËR ZHVILLIM:
-                // Ju duhet të analizoni 'data.rawData' (HTML/JS e portalit) 
-                // për të gjetur listën e vërtetë të kanaleve.
-                // Kjo është e vështirë dhe ndryshon nga portalit në portal.
+                // ⚠️ HAPI I ARDHSHEM: Analizoni data.rawData per te gjetur kanalet reale
                 
-                // Për demonstrim, ne po përdorim sërish një listë të simuluar:
+                // Për demonstrim, lista e simuluar e kanaleve:
                 const simulatedChannels = [
-                     { name: "Kanali Testi 1 (Mux)", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" },
-                     { name: "Kanali Testi 2 (Sintel)", url: "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8" }
+                     { name: "Kanali Testi HLS 1 (Mux)", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" },
+                     { name: "Kanali Testi HLS 2 (Sintel)", url: "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8" }
                 ];
                 
                 renderChannelList(simulatedChannels);
@@ -132,6 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Lidhja e butonit "Lidhu me Portalin"
     connectButton.addEventListener('click', () => {
         const serverUrl = serverUrlInput.value.trim();
         const macAddress = macAddressInput.value.trim();
@@ -147,5 +137,6 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchChannelsFromPortal(serverUrl, macAddress);
     });
 
+    // Fillon kontrollin kur ngarkohet faqja
     checkLoginStatus();
 });
