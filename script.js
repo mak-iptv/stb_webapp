@@ -1,10 +1,13 @@
-// script.js
+// Konfigurimi i Ruajtjes Lokale
 const SERVER_URL_KEY = 'stb_server_url';
 const MAC_ADDRESS_KEY = 'stb_mac_address';
-// Zëvendësojeni këtë me URL-në PUBLIKE të Proxy Server-it tuaj në Render
-const PROXY_SERVER_URL = 'https://stb-webapp.onrender.com'; 
+
+// ZËVENDËSOHENI KËTË URL ME ADRESËN PUBLIKE TË SERVERIT TUAJ PROXY NË RENDER!
+// P.sh.: 'https://emri-juaj-proxy.onrender.com'
+const PROXY_SERVER_URL = 'http://localhost:3000'; 
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Marrja e Elementeve të HTML-së
     const videoElement = document.getElementById('videoPlayer');
     const channelListElement = document.getElementById('channelList');
     const loginSection = document.getElementById('loginSection');
@@ -16,7 +19,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let hlsInstance;
     
-    // Funksioni per te luajtur kanalin me HLS.js
+    // =========================================================
+    // 1. FUNKSIONET E PLAYER-IT DHE LISTËS
+    // =========================================================
+
+    /**
+     * Luan një URL HLS duke përdorur HLS.js
+     * @param {string} url - URL-ja e transmetimit (.m3u8)
+     */
     function playChannel(url) {
         if (hlsInstance) hlsInstance.destroy();
         
@@ -28,11 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
             hlsInstance.loadSource(url);
             hlsInstance.attachMedia(videoElement);
             hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() {
-                videoElement.play().catch(e => console.log('Auto-play u bllokua.'));
+                videoElement.play().catch(e => console.error('Auto-play u bllokua.'));
             });
             hlsInstance.on(Hls.Events.ERROR, function (event, data) {
                  if (data.fatal) {
-                    loginMessage.textContent = `Gabim fatal: ${data.details}. Provoni nje kanal tjeter.`;
+                    loginMessage.textContent = `Gabim fatal. Provoni një kanal tjetër.`;
                     hlsInstance.destroy();
                 }
             });
@@ -42,7 +52,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // Funksioni per te shfaqur listen e kanaleve
+    /**
+     * Shfaq listën e kanaleve të marra
+     * @param {Array<Object>} channels - Lista e objekteve {name, url}
+     */
     function renderChannelList(channels) {
         channelListElement.innerHTML = '';
         if (channels.length === 0) {
@@ -64,16 +77,24 @@ document.addEventListener('DOMContentLoaded', () => {
             channelListElement.appendChild(listItem);
             
             if (index === 0) {
+                // Kliko kanalin e parë për ta luajtur
                 listItem.click(); 
             }
         });
     }
 
-    // Funksioni per te kontaktuar Proxy Server-in
+    // =========================================================
+    // 2. LOGJIKA E LIDHJES DHE API (PROXY)
+    // =========================================================
+    
+    /**
+     * Bën kërkesën te Proxy Serveri për të marrë të dhënat e portalit.
+     */
     async function fetchChannelsFromPortal(serverUrl, macAddress) {
         loginMessage.textContent = 'Duke u lidhur me Proxy Server...';
         connectButton.disabled = true;
 
+        // Kërkesa te Proxy (përdor rrugën e saktë: /api/stb-login)
         const proxyApiUrl = `${PROXY_SERVER_URL}/api/stb-login?portalUrl=${encodeURIComponent(serverUrl)}&macAddress=${macAddress}`;
 
         try {
@@ -82,31 +103,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (response.ok && data.success) {
                 
-                // ⚠️ HAPI I ARDHSHEM: Analizoni data.rawData per te gjetur kanalet reale
+                // ⚠️ HAPI TUAJ I VËRTETË I ZHVILLIMIT:
+                // Këtu do të duhej të analizonit 'data.rawData' (HTML/JS e portalit)
+                // për të nxjerrë listën e vërtetë të kanaleve dhe URL-të e tyre.
                 
-                // Për demonstrim, lista e simuluar e kanaleve:
+                // Për demonstrim, ne përdorim listën e simuluar:
                 const simulatedChannels = [
                      { name: "Kanali Testi HLS 1 (Mux)", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" },
                      { name: "Kanali Testi HLS 2 (Sintel)", url: "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8" }
                 ];
                 
                 renderChannelList(simulatedChannels);
-                loginMessage.textContent = 'Lidhja me Proxy: OK. Duke luajtur kanalin testues.';
+                loginMessage.textContent = 'Lidhja Proxy OK. Kanale testuese të ngarkuara.';
                 
+                // Kalimi nga hyrja te aplikacioni kryesor
                 loginSection.style.display = 'none';
                 mainApp.style.display = 'flex';
                 
             } else {
+                // Gabimi vjen nga Proxy (shkak i 403 nga serveri IPTV)
                 throw new Error(data.error || `Gabim i panjohur. Statusi: ${response.status}`);
             }
 
         } catch (error) {
             console.error("Dështoi lidhja me Proxy:", error);
-            loginMessage.textContent = `Dështoi lidhja. Sigurohuni që Proxy Serveri (${PROXY_SERVER_URL}) të jetë aktiv. Gabimi: ${error.message}.`;
+            // Kjo do të shfaqet nëse ka gabim lidhjeje me proxy ose proxy merr 403 nga portali
+            loginMessage.textContent = `Gabim në lidhje/vërtetim. Detajet: ${error.message}.`;
             connectButton.disabled = false;
         }
     }
 
+    /**
+     * Kontrollon të dhënat e ruajtura dhe nis aplikacionin ose shfaq hyrjen.
+     */
     function checkLoginStatus() {
         const storedUrl = localStorage.getItem(SERVER_URL_KEY);
         const storedMac = localStorage.getItem(MAC_ADDRESS_KEY);
@@ -121,6 +150,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // =========================================================
+    // 3. EVENT LISTENERS
+    // =========================================================
+    
     // Lidhja e butonit "Lidhu me Portalin"
     connectButton.addEventListener('click', () => {
         const serverUrl = serverUrlInput.value.trim();
@@ -131,12 +164,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Ruaj kredencialet
         localStorage.setItem(SERVER_URL_KEY, serverUrl);
         localStorage.setItem(MAC_ADDRESS_KEY, macAddress);
         
         fetchChannelsFromPortal(serverUrl, macAddress);
     });
 
-    // Fillon kontrollin kur ngarkohet faqja
+    // Fillon aplikacionin
     checkLoginStatus();
 });
