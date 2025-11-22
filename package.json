@@ -1,0 +1,22 @@
+{
+  "name": "tb_webapp",
+  "version": "1.0.0",
+  "description": "Proxy server to handle CORS and StB MAC authentication for IPTV portal.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "iptv",
+    "proxy",
+    "node"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "node-fetch": "^2.6.1"
+  }
+}
