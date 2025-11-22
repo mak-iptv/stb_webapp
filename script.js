@@ -4,7 +4,7 @@ const MAC_ADDRESS_KEY = 'stb_mac_address';
 
 // ZËVENDËSOHENI KËTË URL ME ADRESËN PUBLIKE TË SERVERIT TUAJ PROXY NË RENDER!
 // P.sh.: 'https://emri-juaj-proxy.onrender.com'
-const PROXY_SERVER_URL = 'https://stb-webapp.onrender.com/'; 
+const PROXY_SERVER_URL = 'https://stb-webapp.onrender.com'; 
 
 document.addEventListener('DOMContentLoaded', () => {
     // Marrja e Elementeve të HTML-së
