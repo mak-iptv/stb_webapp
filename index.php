@@ -1,29 +1,40 @@
-<?php
-// index.php
-session_start();
-require_once __DIR__ . '/includes/functions.php';
-
-// Kontrollo nëse është lidhur
-if (!isset($_SESSION['portal_url'])) {
-    header('Location: login.php');
-    exit;
-}
-
-// Merr kanalet
-$channels = $_SESSION['channels'] ?? getChannelsFromProvider($_SESSION['portal_url']);
-
-// Shfaq informacion për kanalet
-echo "<h1>Kanalet e TV</h1>";
-echo displayChannelsInfo($channels);
-
-// Shfaq kanalet
-echo displayChannelsList($channels, $_SESSION['portal_url']);
-
-// Lidhje për debug nëse kanalet janë demo
-if (isset($_SESSION['using_demo_channels'])) {
-    echo '<div style="margin: 20px 0; padding: 15px; background: #fff3cd; border-radius: 4px;">';
-    echo '<strong>Problem me lidhjen:</strong> Nuk mund të lidhemi me provider-in. ';
-    echo '<a href="debug.php" style="color: #856404;">Klikoni këtu për debug</a>';
-    echo '</div>';
-}
-?>
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web StB MAC Player</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+    <div id="loginSection" class="login-overlay">
+        <div class="login-box">
+            <h3>🔑 Lidhja e Portalit StB</h3>
+            <label for="serverUrl">URL e Portalit (p.sh., http://server.com:8080)</label>
+            <input type="text" id="serverUrl" placeholder="URL:Port">
+            
+            <label for="macAddress">Adresa MAC (p.sh., 00:1A:79:00:00:00)</label>
+            <input type="text" id="macAddress" placeholder="MAC Address">
+            
+            <button id="connectButton">Lidhu me Portalin</button>
+            <p id="loginMessage" style="color: red;"></p>
+        </div>
+    </div>
+    
+    <div id="mainApp" class="app-container" style="display: none;">
+        <div class="player-container">
+            <video id="videoPlayer" controls autoplay></video>
+        </div>
+        
+        <div class="sidebar">
+            <h2>Kanale</h2>
+            <ul id="channelList">
+                <li>Duke u lidhur...</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
