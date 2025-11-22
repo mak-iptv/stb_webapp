@@ -2,7 +2,7 @@
 const SERVER_URL_KEY = 'stb_server_url';
 const MAC_ADDRESS_KEY = 'stb_mac_address';
 // URL-ja e Proxy Server-it që po ekzekutoni në localhost:3000
-const PROXY_SERVER_URL = 'http://testdi1.proxytx.clou'; 
+const PROXY_SERVER_URL = 'http://testdi1.proxytx.cloud'; 
 
 document.addEventListener('DOMContentLoaded', () => {
     const videoElement = document.getElementById('videoPlayer');
