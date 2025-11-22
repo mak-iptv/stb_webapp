@@ -1,7 +1,7 @@
 // script.js
 const SERVER_URL_KEY = 'stb_server_url';
 const MAC_ADDRESS_KEY = 'stb_mac_address';
-// Kjo është URL-ja e Proxy Serverit tuaj në Render
+// 🛑 Zëvendësojeni këtë URL me adresën tuaj publike të Proxy Serverit në Render!
 const PROXY_SERVER_URL = 'https://stb-webapp.onrender.com'; 
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -17,17 +17,18 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let hlsInstance;
 
-    // Funksionet e luajtjes së videos (të paprekura)
     function playChannel(url) {
-        // ... kodi i playChannel ...
         if (hlsInstance) hlsInstance.destroy();
         videoElement.src = '';
         loginMessage.textContent = '';
+        
         if (Hls.isSupported()) {
             hlsInstance = new Hls();
             hlsInstance.loadSource(url);
             hlsInstance.attachMedia(videoElement);
             hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() {
+                // Zëri vendoset muted për të shmangur bllokimin e Auto-play
+                videoElement.muted = true; 
                 videoElement.play().catch(e => console.error('Auto-play u bllokua.'));
             });
             hlsInstance.on(Hls.Events.ERROR, function (event, data) {
@@ -38,12 +39,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
             videoElement.src = url;
+            videoElement.muted = true; // Zëri muted edhe për Apple native player
             videoElement.play();
         }
     }
     
     function renderChannelList(channels) { 
-        // ... kodi i renderChannelList ...
         channelListElement.innerHTML = '';
         if (channels.length === 0) {
             channelListElement.innerHTML = '<li>Nuk u gjetën kanale.</li>';
@@ -65,32 +66,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Funksioni i analizës (Parsing)
+    /**
+     * Zëvendësojeni këtë funksion për të analizuar data.rawData reale.
+     */
     function extractChannels(portalContent) {
         console.log("Duke analizuar përmbajtjen e portalit...");
-        
-        // 🛑 KËTU ZGJIDHET PROBLEMI JUATOR ME KANALET 🛑
-        // Për momentin, kthejmë listën testuese, por tani jemi gati të marrim përmbajtjen e portalit.
+        // Kjo listë është vetëm për testim:
         return [
              { name: "Kanali Testi HLS 1 (Mux)", url: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" },
              { name: "Kanali Testi HLS 2 (Sintel)", url: "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8" }
         ];
     }
     
-    // Funksioni i marrjes së të dhënave nga Proxy
     async function fetchChannelsFromPortal(serverUrl, macAddress) {
-        // Kjo linjë merr vlerat string (sakte)
         const currentUrl = serverUrl.trim();
         const currentMac = macAddress.trim();
 
         loginMessage.textContent = 'Duke u lidhur me Proxy Server...';
         connectButton.disabled = true;
 
-        // Kërkesa te Proxy (përdor rrugën e saktë: /api/stb-login)
         const proxyApiUrl = `${PROXY_SERVER_URL}/api/stb-login?portalUrl=${encodeURIComponent(currentUrl)}&macAddress=${currentMac}`;
         
-        console.log("Kërkesa API te Proxy:", proxyApiUrl); 
-
         try {
             const response = await fetch(proxyApiUrl);
             const data = await response.json();
@@ -101,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 renderChannelList(realChannels);
                 
-                loginMessage.textContent = 'Lidhja Proxy OK. Kanale të ngarkuara.';
+                loginMessage.textContent = 'Lidhja Proxy OK. Kanale testuese të ngarkuara.';
                 loginSection.style.display = 'none';
                 mainApp.style.display = 'flex';
                 
@@ -123,7 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (storedUrl && storedMac) {
             serverUrlInput.value = storedUrl;
             macAddressInput.value = storedMac;
-            // 🛑 Kjo thirrje përdor vlerat string nga localStorage (sakte)
             fetchChannelsFromPortal(storedUrl, storedMac);
         } else {
             mainApp.style.display = 'none';
@@ -131,9 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Lidhja e butonit "Lidhu me Portalin"
     connectButton.addEventListener('click', () => {
-        // 🛑 Këtu merren vlerat string duke përdorur .value (sakte)
+        // 🛑 Merret Vlera (value) e fushës, jo Objekti (zgjidh gabimin e vjetër)
         const serverUrl = serverUrlInput.value; 
         const macAddress = macAddressInput.value;
         
@@ -145,8 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem(SERVER_URL_KEY, serverUrl);
         localStorage.setItem(MAC_ADDRESS_KEY, macAddress);
         
-        // 🛑 Këtu kalojnë vlerat string (sakte)
-        fetchChannelsFromPortal(serverUrl, macAddress); 
+        fetchChannelsFromPortal(serverUrl, macAddress);
     });
 
     checkLoginStatus();
